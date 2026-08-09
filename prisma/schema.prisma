@@ -19,3 +19,15 @@ model departments {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
+enum roleType {
+  MANAGER
+  EMPLOYEE
+}
+
+model users {
+  id Int @id @default(autoincrement())
+  mobile String @unique
+  password String
+  role roleType @default(EMPLOYEE)
+}
