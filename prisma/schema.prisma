@@ -30,4 +30,14 @@ model users {
   mobile String @unique
   password String
   role roleType @default(EMPLOYEE)
+  refreshTokens refresh_tokens[]
+}
+
+model refresh_tokens {
+  id Int @id @default(autoincrement())
+  tokenHash String
+  userId Int
+  createdAt DateTime @default(now())
+  revokedAt  DateTime?
+  user users @relation(fields: [userId],references: [id])
 }
