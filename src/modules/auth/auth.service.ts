@@ -64,7 +64,7 @@ export class AuthService {
       { payload },
       {
         secret: this.config.get('JWT_ACCESS_SECRET'),
-        expiresIn: this.config.get('ACCESS_TOKEN_EXPIRE'),
+        expiresIn: this.config.get('ACCESS_TOKEN_EXPIRE') || '15m',
       },
     );
 
@@ -73,7 +73,7 @@ export class AuthService {
       { sub: user.id },
       {
         secret: this.config.get('JWT_REFRESH_SECRET'),
-        expiresIn: this.config.get('REFRESH_TOKEN_EXPIRE'),
+        expiresIn: this.config.get('REFRESH_TOKEN_EXPIRE') || '14d',
       },
     );
 
@@ -87,5 +87,81 @@ export class AuthService {
       refreshToken,
       user,
     };
+  }
+
+  async refreshToken(providedRefreshToken: string) {
+    let payload: any;
+    try {
+      payload = this.jwtService.verify(providedRefreshToken, {
+        secret: this.config.get('JWT_REFRESH_SECRET'),
+      });
+    } catch {
+      throw new UnauthorizedException('Invalid refresh token!');
+    }
+
+    const userId = payload.sub;
+
+    // ۱. دریافت توکن‌های فعال کاربر همراه با اطلاعات خود کاربر
+    const tokens = await this.prisma.refresh_tokens.findMany({
+      where: {
+        userId: userId,
+        revokedAt: null, // فقط توکن‌هایی که باطل نشده‌اند
+      },
+      include: {
+        user: true, // معادل leftJoinAndSelect در TypeORM
+      },
+    });
+
+    let isValidRefreshToken = false;
+
+    for (const rt of tokens) {
+      const match = await bcrypt.compare(providedRefreshToken, rt.tokenHash);
+
+      if (match) {
+        isValidRefreshToken = true;
+
+        // ۲. باطل کردن توکن فعلی (تنظیم revokedAt)
+        await this.prisma.refresh_tokens.update({
+          where: { id: rt.id },
+          data: { revokedAt: new Date() },
+        });
+
+        const user = rt.user;
+        const accessTokenPayload = { sub: user.id, role: user.role };
+
+        // Access token
+        const newAccessToken = this.jwtService.sign(accessTokenPayload, {
+          secret: this.config.get('JWT_ACCESS_SECRET'),
+          expiresIn: this.config.get('ACCESS_TOKEN_EXPIRE') || '15m',
+        });
+
+        // Refresh token
+        const newRefreshToken = this.jwtService.sign(
+          { sub: user.id },
+          {
+            secret: this.config.get('JWT_REFRESH_SECRET'),
+            expiresIn: this.config.get('REFRESH_TOKEN_EXPIRE') || '14d',
+          },
+        );
+
+        // ۳. هش و ذخیره توکن جدید در دیتابیس
+        const tokenHash = await bcrypt.hash(newRefreshToken, 12);
+        await this.prisma.refresh_tokens.create({
+          data: {
+            tokenHash: tokenHash,
+            userId: user.id,
+          },
+        });
+
+        return {
+          newAccessToken,
+          newRefreshToken,
+        };
+      }
+    }
+
+    if (!isValidRefreshToken) {
+      throw new BadRequestException('توکن شما معتبر نیست');
+    }
   }
 }
