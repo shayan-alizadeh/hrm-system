@@ -108,7 +108,7 @@ export class AuthService {
         revokedAt: null, // فقط توکن‌هایی که باطل نشده‌اند
       },
       include: {
-        user: true, // معادل leftJoinAndSelect در TypeORM
+        user: true,
       },
     });
 
@@ -163,5 +163,16 @@ export class AuthService {
     if (!isValidRefreshToken) {
       throw new BadRequestException('توکن شما معتبر نیست');
     }
+  }
+  async logout(userId: number) {
+    await this.prisma.refresh_tokens.updateMany({
+      where: {
+        userId: userId,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+      },
+    });
   }
 }
