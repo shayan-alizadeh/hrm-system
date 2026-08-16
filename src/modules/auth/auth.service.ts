@@ -4,10 +4,10 @@ import {
   UnauthorizedException,
   Injectable,
 } from '@nestjs/common';
-import { roleType } from 'generated/prisma/enums';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { roleType } from '../../../generated/prisma/enums.js';
+import { PrismaService } from '../../prisma/prisma.service.js';
 import * as bcrypt from 'bcrypt';
-import { users } from 'generated/prisma/browser';
+import { users } from 'generated/prisma/browser.js';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 

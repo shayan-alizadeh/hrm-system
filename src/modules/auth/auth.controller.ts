@@ -1,8 +1,8 @@
 import { Body, Controller, Post, UnauthorizedException } from '@nestjs/common';
-import { AuthService } from './auth.service';
-import { RegisterDto } from './dto/register.dto';
-import { LoginDto } from './dto/login.dto';
-import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { AuthService } from './auth.service.js';
+import { RegisterDto } from './dto/register.dto.js';
+import { LoginDto } from './dto/login.dto.js';
+import { RefreshTokenDto } from './dto/refresh-token.dto.js';
 // import { Public } from './decorators/public.decorator';
 // import { ApiTags } from '@nestjs/swagger';
 

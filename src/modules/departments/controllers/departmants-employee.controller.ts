@@ -1,9 +1,9 @@
 import { Controller, Get, Param, ParseIntPipe } from '@nestjs/common';
-import { DepartmentsEmployeeService } from '../services/departments-employee.service';
+import { DepartmentsEmployeeService } from '../services/departments-employee.service.js';
 // import { Department } from '../entities/department.entity';
 import { ApiBearerAuth } from '@nestjs/swagger';
-import { roleType } from 'generated/prisma/enums';
-import { Roles } from '../../../modules/auth/decorators/roles.decorator';
+import { roleType } from '../../../../generated/prisma/enums.js';
+import { Roles } from '../../../modules/auth/decorators/roles.decorator.js';
 
 /**
  * کنترلر مخصوص کارمندان برای مشاهده دپارتمان‌ها
