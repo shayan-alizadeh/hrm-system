@@ -1,15 +1,15 @@
 import { Controller, Get, Param, ParseIntPipe } from '@nestjs/common';
 import { DepartmentsEmployeeService } from '../services/departments-employee.service';
 // import { Department } from '../entities/department.entity';
-// import { ApiBearerAuth } from '@nestjs/swagger';
-// import { Role } from '../../../shared/enums/user-role.enum';
-// import { Roles } from '../../../modules/auth/decorators/roles.decorator';
+import { ApiBearerAuth } from '@nestjs/swagger';
+import { roleType } from 'generated/prisma/enums';
+import { Roles } from '../../../modules/auth/decorators/roles.decorator';
 
 /**
  * کنترلر مخصوص کارمندان برای مشاهده دپارتمان‌ها
  */
 @ApiBearerAuth()
-@Roles(Role.EMPLOYEE)
+@Roles(roleType.EMPLOYEE)
 @Controller('employee/departments')
 export class DepartmentsEmployeeController {
   constructor(
