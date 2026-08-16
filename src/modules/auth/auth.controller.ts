@@ -3,9 +3,11 @@ import { AuthService } from './auth.service.js';
 import { RegisterDto } from './dto/register.dto.js';
 import { LoginDto } from './dto/login.dto.js';
 import { RefreshTokenDto } from './dto/refresh-token.dto.js';
-// import { Public } from './decorators/public.decorator';
-// import { ApiTags } from '@nestjs/swagger';
+import { Public } from './decorators/public.decorator.js';
+import { ApiTags } from '@nestjs/swagger';
 
+@ApiTags('سیستم احراز هویت')
+@Public()
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}

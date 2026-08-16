@@ -44,6 +44,35 @@ async function bootstrap() {
 
   SwaggerModule.setup('api/v1/manager/docs', app, managerDocument);
 
+  // @Employee swagger
+  const employeeConfig = new DocumentBuilder()
+    .setTitle('Hr API - employee routes')
+    .setDescription(
+      'این روت ها مربوط به نقش کاربری کارمند هست و در پنل employee مورد استفاده قرار خواهد گرفت',
+    )
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+
+  const employeeDocument = SwaggerModule.createDocument(app, employeeConfig, {
+    include: [AppModule],
+    deepScanRoutes: true,
+  });
+
+  if (employeeDocument.paths) {
+    Object.keys(employeeDocument.paths).forEach((path) => {
+      if (
+        !path.includes('/employee') &&
+        !path.includes('/auth') &&
+        !path.includes('/uploads')
+      ) {
+        delete employeeDocument.paths[path];
+      }
+    });
+  }
+
+  SwaggerModule.setup('api/v1/employee/docs', app, employeeDocument);
+
   await app.listen(port);
   console.log(`Application ${appName} is running on port : ${port}`);
 }

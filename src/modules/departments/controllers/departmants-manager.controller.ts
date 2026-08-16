@@ -21,9 +21,9 @@ import { Roles } from '../../../modules/auth/decorators/roles.decorator.js';
  * کنترلر ادمین برای مدیریت دپارتمان‌ها
  * مسیرهای CRUD را ارائه می‌دهد
  */
+// api.hrsystem.ir/manager
 @ApiBearerAuth()
 @Roles(roleType.MANAGER)
-// api.hrsystem.ir/manager
 @Controller('manager/departments')
 export class DepartmentsManagerController {
   constructor(private readonly departmentsService: DepartmentsManagerService) {}
