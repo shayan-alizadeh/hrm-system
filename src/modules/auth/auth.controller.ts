@@ -6,7 +6,7 @@ import { RefreshTokenDto } from './dto/refresh-token.dto.js';
 import { Public } from './decorators/public.decorator.js';
 import { ApiTags } from '@nestjs/swagger';
 
-@ApiTags('سیستم احراز هویت')
+@ApiTags('Auth')
 @Public()
 @Controller('auth')
 export class AuthController {

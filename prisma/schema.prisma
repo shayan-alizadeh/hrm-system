@@ -21,8 +21,8 @@ model departments {
 }
 
 enum roleType {
-  MANAGER
-  EMPLOYEE
+  MANAGER 
+  EMPLOYEE 
 }
 
 model users {
