@@ -38,8 +38,8 @@ export class RegisterDto {
   password!: string;
 
   @ApiPropertyOptional({
-    description: 'نقش کاربری (manager یا employee)',
-    example: 'employee',
+    description: 'نقش کاربری (MANAGER یا EMPLOYEE)',
+    example: 'EMPLOYEE',
     enum: roleType,
     enumName: 'Role',
   })
