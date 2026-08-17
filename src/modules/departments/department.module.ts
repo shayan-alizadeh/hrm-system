@@ -4,9 +4,9 @@ import { DepartmentsManagerService } from './services/departments-manager.servic
 import { DepartmentsEmployeeController } from './controllers/departmants-employee.controller.js';
 import { DepartmentsEmployeeService } from './services/departments-employee.service.js';
 
-Module({
+@Module({
   imports: [],
   controllers: [DepartmentsManagerController, DepartmentsEmployeeController],
   providers: [DepartmentsManagerService, DepartmentsEmployeeService],
-});
+})
 export class DepartmentModule {}
