@@ -12,7 +12,7 @@ export class DepartmentsManagerService {
   constructor(private readonly prisma: PrismaService) {}
 
   /** ایجاد دپارتمان جدید */
-  async create(payload: CreateDepartmentDto){
+  async create(payload: CreateDepartmentDto) {
     return await this.prisma.departments.create({
       data: payload,
     });

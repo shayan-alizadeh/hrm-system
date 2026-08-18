@@ -60,13 +60,10 @@ export class AuthService {
     const payload = { sub: user.id, role: user.role };
 
     //Access token
-    const accessToken = this.jwtService.sign(
-      { payload },
-      {
-        secret: this.config.get('JWT_ACCESS_SECRET'),
-        expiresIn: this.config.get('ACCESS_TOKEN_EXPIRE') || '15m',
-      },
-    );
+    const accessToken = this.jwtService.sign(payload, {
+      secret: this.config.get('JWT_ACCESS_SECRET'),
+      expiresIn: this.config.get('ACCESS_TOKEN_EXPIRE') || '15m',
+    });
 
     //Refresh token
     const refreshToken = this.jwtService.sign(
@@ -78,7 +75,7 @@ export class AuthService {
     );
 
     const tokenHash = await bcrypt.hash(refreshToken, 12);
-    const rt = this.prisma.refresh_tokens.create({
+    const rt = await this.prisma.refresh_tokens.create({
       data: { tokenHash, userId: user.id },
     });
 
@@ -176,7 +173,7 @@ export class AuthService {
     });
   }
   async findUserById(userId: number) {
-    const user = await this.prisma.users.findUnique({ where: { id: userId }})
+    const user = await this.prisma.users.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
     return user;
   }
