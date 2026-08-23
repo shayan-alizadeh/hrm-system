@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>ورود به سیستم HR</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+   <link rel="preconnect" href="//fdn.fontcdn.ir">
+    <link rel="preconnect" href="//v1.fontapi.ir">
+    <link href="https://v1.fontapi.ir/css/Shabnam" rel="stylesheet">
+    <link rel="stylesheet" href="./utils/app.css">
+  <style>
+    body{
+        margin: 0;
+        background: #f5f7fb;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+    }
+    .login-box {
+      background: #fff;
+      width: 360px;
+      padding: 28px;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.08);
+    }
+
+    h1 {
+      font-size: 18px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    label {
+      font-size: 13px;
+      display: block;
+      margin-top: 14px;
+      color: #374151;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      margin-top: 6px;
+      border-radius: 10px;
+      border: 1px solid #e5e7eb;
+      outline: none;
+    }
+
+    .roles {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .role {
+      flex: 1;
+      text-align: center;
+      padding: 10px;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .role.active {
+      background: #4f46e5;
+      color: #fff;
+      border-color: #4f46e5;
+    }
+
+    button {
+      margin-top: 20px;
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 12px;
+      background: #4f46e5;
+      color: #fff;
+      font-size: 15px;
+      cursor: pointer;
+    }
+
+    .error {
+      margin-top: 12px;
+      font-size: 13px;
+      color: #dc2626;
+      display: none;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="login-box">
+    <h1>ورود به سیستم HR</h1>
+
+    <div class="roles">
+      <div class="role active" data-role="employee">کارمند</div>
+      <div class="role" data-role="manager">مدیر</div>
+    </div>
+
+    <label>شماره موبایل</label>
+    <input type="text" id="mobile" placeholder="09xxxxxxxxx" />
+
+    <label>رمز عبور</label>
+    <input type="password" id="password" />
+
+    <button onclick="login()">ورود</button>
+
+    <div class="error" id="error">اطلاعات ورود نادرست است</div>
+  </div>
+
+  <script src="./utils/api.js"></script>
+  <script src="./utils/toast.js"></script>
+  <script src="./utils/auth.js"></script>
+
+  <script>
+    let selectedRole = 'employee';
+
+    document.querySelectorAll('.role').forEach(el => {
+      el.addEventListener('click', () => {
+        document.querySelectorAll('.role').forEach(r => r.classList.remove('active'));
+        el.classList.add('active');
+        selectedRole = el.dataset.role;
+      });
+    });
+
+    async function login() {
+  const mobile = document.getElementById('mobile').value.trim();
+  const password = document.getElementById('password').value.trim();
+
+  // ✅ ولیدیشن اولیه سمت فرانت
+  if (!mobile || !password) {
+    showToast('لطفاً شماره موبایل و رمز عبور را وارد کنید', 'error');
+    return;
+  }
+
+  try {
+    // 🔄 درخواست لاگین به API
+    const result = await loginRequest({
+      mobile,
+      password,
+      role: selectedRole
+    });
+
+    // ✅ اگر لاگین موفق بود
+    if (result?.success && result?.data) {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('role');
+
+        // ✅ ذخیره سشن جدید
+        localStorage.setItem('accessToken', result.data.accessToken);
+        localStorage.setItem('refreshToken', result.data.refreshToken);
+        localStorage.setItem('role', result.data.role);
+
+        showToast('با موفقیت وارد شدید', 'success')
+
+      // ⏳ یه تاخیر کوچیک برای UX بهتر
+      setTimeout(() => {
+        window.location.href = 'dashboard.html';
+      }, 800);
+    } else {
+      showToast('خطا در ورود به سیستم', 'error');
+    }
+
+  } catch (error) {
+    // ❌ اینجا چیزی نمی‌نویسیم
+    // چون:
+    // - error ها تو api.js هندل شدن
+    // - toast ها هم اونجا نمایش داده شدن
+    console.error('Login failed:', error);
+  }
+}
+
+  </script>
+
+</body>
+</html>
