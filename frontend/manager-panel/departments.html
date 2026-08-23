@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>مدیریت دپارتمان‌ها</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+   <link rel="stylesheet" href="../utils/app.css">
+  <style>
+    body {
+      margin: 0;
+      font-family: Shabnam, sans-serif;
+      background: #f5f7fb;
+      color: #1f2937;
+    }
+
+    header {
+      padding: 20px 28px;
+      background: #fff;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    header h1 {
+      font-size: 18px;
+      margin: 0;
+    }
+
+    main {
+      padding: 28px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 20px;
+      border: 1px solid #e5e7eb;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    button {
+      border: none;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .btn-primary { background: #4f46e5; color: #fff; }
+    .btn-danger { background: #dc2626; color: #fff; }
+    .btn-secondary { background: #e5e7eb; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      text-align: right;
+      padding: 12px;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 14px;
+    }
+
+    th { background: #f9fafb; }
+
+    .actions button {
+      margin-left: 6px;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.4);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal {
+      background: #fff;
+      width: 380px;
+      padding: 24px;
+      border-radius: 16px;
+    }
+
+    .modal h2 {
+      font-size: 16px;
+      margin-top: 0;
+    }
+
+    label {
+      font-size: 13px;
+      display: block;
+      margin-top: 12px;
+    }
+
+    input, textarea {
+      width: 100%;
+      margin-top: 6px;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid #e5e7eb;
+      font-family: inherit;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>مدیریت دپارتمان‌ها</h1>
+</header>
+
+<main>
+  <div class="card">
+    <div class="card-header">
+      <strong>لیست دپارتمان‌ها</strong>
+      <button class="btn-primary" onclick="openModal()">افزودن دپارتمان</button>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>نام دپارتمان</th>
+          <th>توضیحات</th>
+          <th>عملیات</th>
+        </tr>
+      </thead>
+      <tbody id="departments-table"></tbody>
+    </table>
+  </div>
+</main>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div style="margin: 10px;">
+        <h2 id="modal-title">افزودن دپارتمان</h2>
+
+    <label>نام دپارتمان</label>
+    <input id="dept-name" />
+
+    <label>توضیحات</label>
+    <textarea id="dept-desc" rows="3"></textarea>
+
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModal()">انصراف</button>
+      <button class="btn-primary" onclick="saveDepartment()">ذخیره</button>
+    </div>
+    </div>
+  </div>
+</div>
+
+</body>
+<script src="../utils/api.js"></script>
+<script src="../utils/toast.js"></script>
+<script src="../utils/auth.js"></script>
+
+<script>
+  // ================= Guard نقش مدیر =================
+  if (localStorage.getItem('role') !== 'manager') {
+    window.location.href = '../login.php';
+  }
+
+  let departments = [];
+  let editingId = null;
+
+  // ================= READ =================
+  async function fetchDepartments() {
+    try {
+      const result = await apiRequest({
+        url: '/manager/departments',
+        method: 'GET',
+        auth: true
+      });
+
+      departments = result.data || [];
+      renderTable();
+    } catch (e) {
+      // خطاها toast شدن
+    }
+  }
+
+  function renderTable() {
+    const tbody = document.getElementById('departments-table');
+    tbody.innerHTML = '';
+
+    if (!departments.length) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="3" style="text-align:center;color:#6b7280">
+            دپارتمانی ثبت نشده است
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    departments.forEach(dep => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${dep.name}</td>
+        <td>${dep.description || '-'}</td>
+        <td class="actions">
+          <button class="btn-secondary" onclick="editDepartment(${dep.id})">ویرایش</button>
+          <button class="btn-danger" onclick="deleteDepartment(${dep.id})">حذف</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // ================= MODAL =================
+  function openModal() {
+    editingId = null;
+    document.getElementById('modal-title').innerText = 'افزودن دپارتمان';
+    document.getElementById('dept-name').value = '';
+    document.getElementById('dept-desc').value = '';
+    document.getElementById('modal').style.display = 'flex';
+  }
+
+  function closeModal() {
+    document.getElementById('modal').style.display = 'none';
+  }
+
+  // ================= CREATE & UPDATE =================
+  async function saveDepartment() {
+    const name = document.getElementById('dept-name').value.trim();
+    const description = document.getElementById('dept-desc').value.trim();
+
+    if (!name) {
+      showToast('نام دپارتمان الزامی است', 'error');
+      return;
+    }
+
+    try {
+      if (editingId) {
+        // UPDATE (PATCH)
+        await apiRequest({
+          url: `/manager/departments/${editingId}`,
+          method: 'PATCH',
+          auth: true,
+          body: { name, description }
+        });
+
+        showToast('دپارتمان با موفقیت ویرایش شد', 'success');
+      } else {
+        // CREATE (POST)
+        await apiRequest({
+          url: '/manager/departments',
+          method: 'POST',
+          auth: true,
+          body: { name, description }
+        });
+
+        showToast('دپارتمان با موفقیت ایجاد شد', 'success');
+      }
+
+      closeModal();
+      fetchDepartments();
+
+    } catch (e) {
+      // خطاها قبلاً toast شدن
+    }
+  }
+
+  // ================= EDIT =================
+  function editDepartment(id) {
+    const dep = departments.find(d => d.id === id);
+    if (!dep) return;
+
+    editingId = id;
+    document.getElementById('modal-title').innerText = 'ویرایش دپارتمان';
+    document.getElementById('dept-name').value = dep.name;
+    document.getElementById('dept-desc').value = dep.description || '';
+    document.getElementById('modal').style.display = 'flex';
+  }
+
+  // ================= DELETE =================
+  async function deleteDepartment(id) {
+    if (!confirm('آیا از حذف این دپارتمان مطمئن هستید؟')) return;
+
+    try {
+      await apiRequest({
+        url: `/manager/departments/${id}`,
+        method: 'DELETE',
+        auth: true
+      });
+
+      showToast('دپارتمان حذف شد', 'success');
+      fetchDepartments();
+
+    } catch (e) {
+      // خطاها toast شدن
+    }
+  }
+
+  // ================= INIT =================
+  fetchDepartments();
+</script>
+
+
+</html>
