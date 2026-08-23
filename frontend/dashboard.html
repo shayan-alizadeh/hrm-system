@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>HR Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+   <link rel="stylesheet" href="./utils/app.css">
+  <style>
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    header {
+      padding: 20px 28px;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    header h1 {
+      font-size: 20px;
+      margin: 0;
+    }
+
+    .role-switch {
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    main {
+      padding: 32px;
+    }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 24px;
+    }
+
+    .module {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 20px;
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .module-title {
+      font-size: 16px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .module-title::before {
+      content: "";
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--primary);
+    }
+
+    .submodules {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .submodule {
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: #eef2ff;
+      color: #3730a3;
+      font-size: 13px;
+      text-decoration: none;
+      transition: all .2s ease;
+    }
+
+    .submodule:hover {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    footer {
+      margin-top: 40px;
+      font-size: 12px;
+      color: var(--muted);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>داشبورد سیستم منابع انسانی</h1>
+    <div class="role-switch">
+      نقش فعال: <strong id="role">مدیر</strong>
+    </div>
+  </header>
+
+  <main>
+    <section class="dashboard" id="dashboard"></section>
+    <footer>HR System • Vanilla JS Dashboard</footer>
+  </main>
+
+  <script>
+    // نقش کاربر (بعداً از JWT یا API میاد)
+    const role = localStorage.getItem('role'); // employee | manager
+    document.getElementById('role').innerText = role;
+
+    const modules = {
+      employee: [
+        {
+          title: 'حضور و غیاب',
+          items: [
+            { label: 'ثبت تردد', link: 'employee-panel/attendance.html' },
+            { label: 'گزارش تردد', link: 'employee-panel/attendance.html' },
+          ]
+        },
+        {
+          title: 'حقوق و دستمزد',
+          items: [
+            { label: 'فیش حقوقی', link: 'employee-panel/payroll.html' },
+            { label: 'مرخصی ها', link: 'employee-panel/leaves.html' },
+          ]
+        }
+      ],
+
+      manager: [
+        {
+          title: 'مدیریت پرسنل',
+          items: [
+            { label: 'پروفایل کارمندان', link: '/employee/profile' },
+            { label: 'قراردادها ', link: '/employee/documents' },
+            { label: 'دپارتمان‌ها و واحد سازمانی', link: 'manager-panel/departments.html' }
+          ]
+        },
+        {
+          title: 'حضور و غیاب',
+          items: [
+            { label: 'گزارش کلی', link: '/manager/attendance' }
+          ]
+        }
+      ]
+    };
+
+    const dashboard = document.getElementById('dashboard');
+
+    modules[role].forEach(module => {
+      const card = document.createElement('div');
+      card.className = 'module';
+
+      const title = document.createElement('div');
+      title.className = 'module-title';
+      title.innerText = module.title;
+
+      const sub = document.createElement('div');
+      sub.className = 'submodules';
+
+      module.items.forEach(item => {
+        const a = document.createElement('a');
+        a.className = 'submodule';
+        a.href = item.link;
+        a.innerText = item.label;
+        sub.appendChild(a);
+      });
+
+      card.appendChild(title);
+      card.appendChild(sub);
+      dashboard.appendChild(card);
+    });
+  </script>
+</body>
+</html>
