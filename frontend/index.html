@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>HR Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="preconnect" href="//fdn.fontcdn.ir">
+    <link rel="preconnect" href="//v1.fontapi.ir">
+    <link href="https://v1.fontapi.ir/css/Shabnam" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --card: #ffffff;
+      --primary: #4f46e5;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --radius: 16px;
+    }
+
+    * {
+      box-sizing: border-box;
+      font-family: Shabnam, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    header {
+      padding: 20px 28px;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    header h1 {
+      font-size: 20px;
+      margin: 0;
+    }
+
+    .role-switch {
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    main {
+      padding: 32px;
+    }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 24px;
+    }
+
+    .module {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 20px;
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .module-title {
+      font-size: 16px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .module-title::before {
+      content: "";
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--primary);
+    }
+
+    .submodules {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .submodule {
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: #eef2ff;
+      color: #3730a3;
+      font-size: 13px;
+      text-decoration: none;
+      transition: all .2s ease;
+    }
+
+    .submodule:hover {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    footer {
+      margin-top: 40px;
+      font-size: 12px;
+      color: var(--muted);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>داشبورد سیستم منابع انسانی</h1>
+    <div class="role-switch">
+      نقش فعال: <strong id="role">Employee</strong>
+    </div>
+  </header>
+
+  <main>
+    <section class="dashboard" id="dashboard"></section>
+    <footer>HR System • Vanilla JS Dashboard</footer>
+  </main>
+
+  <script>
+    // نقش کاربر (بعداً از JWT یا API میاد)
+    const role = 'employee'; // employee | manager
+    document.getElementById('role').innerText = role;
+
+    const modules = {
+      employee: [
+        {
+          title: 'پروفایل کارمند',
+          items: [
+            { label: 'اطلاعات شخصی', link: '/employee/profile' },
+            { label: 'مدارک', link: '/employee/documents' }
+          ]
+        },
+        {
+          title: 'حضور و غیاب',
+          items: [
+            { label: 'ثبت تردد', link: '/employee/attendance/check' },
+            { label: 'گزارش تردد', link: '/employee/attendance/report' }
+          ]
+        },
+        {
+          title: 'مرخصی',
+          items: [
+            { label: 'درخواست مرخصی', link: '/employee/leave/request' },
+            { label: 'سوابق مرخصی', link: '/employee/leave/history' }
+          ]
+        }
+      ],
+
+      manager: [
+        {
+          title: 'مدیریت کارکنان',
+          items: [
+            { label: 'لیست کارکنان', link: '/manager/employees' },
+            { label: 'افزودن کارمند', link: '/manager/employees/create' }
+          ]
+        },
+        {
+          title: 'حضور و غیاب',
+          items: [
+            { label: 'گزارش کلی', link: '/manager/attendance' },
+            { label: 'اصلاح تردد', link: '/manager/attendance/edit' }
+          ]
+        },
+        {
+          title: 'مرخصی‌ها',
+          items: [
+            { label: 'درخواست‌ها', link: '/manager/leave/requests' },
+            { label: 'تنظیم سیاست‌ها', link: '/manager/leave/policies' }
+          ]
+        }
+      ]
+    };
+
+    const dashboard = document.getElementById('dashboard');
+
+    modules[role].forEach(module => {
+      const card = document.createElement('div');
+      card.className = 'module';
+
+      const title = document.createElement('div');
+      title.className = 'module-title';
+      title.innerText = module.title;
+
+      const sub = document.createElement('div');
+      sub.className = 'submodules';
+
+      module.items.forEach(item => {
+        const a = document.createElement('a');
+        a.className = 'submodule';
+        a.href = item.link;
+        a.innerText = item.label;
+        sub.appendChild(a);
+      });
+
+      card.appendChild(title);
+      card.appendChild(sub);
+      dashboard.appendChild(card);
+    });
+  </script>
+</body>
+</html>
