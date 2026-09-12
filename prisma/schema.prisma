@@ -31,6 +31,7 @@ model users {
   password String
   role roleType @default(EMPLOYEE)
   refreshTokens refresh_tokens[]
+  attendance attendances[]
 }
 
 model refresh_tokens {
@@ -40,4 +41,16 @@ model refresh_tokens {
   createdAt DateTime @default(now())
   revokedAt  DateTime?
   user users @relation(fields: [userId],references: [id])
+}
+
+model attendances {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  user          users     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  j_date        String   @db.VarChar(10)
+  checkInTime   DateTime?
+  checkOutTime  DateTime?
+  notes         String?  @db.VarChar(250)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
