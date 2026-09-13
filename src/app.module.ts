@@ -8,6 +8,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from './modules/auth/guards/roles.guard.js';
+import { AttendanceModule } from './modules/attendances/attendance.module.js';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard.js';
     PrismaModule,
     DepartmentModule,
     AuthModule,
+    AttendanceModule,
   ],
   controllers: [AppController],
   providers: [

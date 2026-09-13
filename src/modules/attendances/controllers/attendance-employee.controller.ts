@@ -6,7 +6,7 @@ import { AttendanceEmployeeService } from '../services/attendance-employee.servi
 import { CheckInOutDto } from '../dto/check-in-out.dto.js';
 import { User } from '../../../common/decorators/user.decorator.js';
 import { FilterAttendanceDto } from '../dto/filter-attendance.dto.js';
-import { attendances } from 'generated/prisma/client.js';
+import { attendances } from '../../../../generated/prisma/client.js';
 
 
 @ApiBearerAuth()
