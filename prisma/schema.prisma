@@ -31,7 +31,7 @@ model users {
   password String
   role roleType @default(EMPLOYEE)
   refreshTokens refresh_tokens[]
-  attendance attendances[]
+  attendances attendances[]
 }
 
 model refresh_tokens {

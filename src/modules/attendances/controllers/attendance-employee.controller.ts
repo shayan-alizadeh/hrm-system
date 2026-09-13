@@ -1,15 +1,16 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth } from '@nestjs/swagger';
-import { Roles } from '../../../modules/auth/decorators/roles.decorator';
-import { Role } from '../../../shared/enums/user-role.enum';
+import { Roles } from '../../../modules/auth/decorators/roles.decorator.js';
+import  { roleType } from '../../../../generated/prisma/enums.js';
 import { AttendanceEmployeeService } from '../services/attendance-employee.service.js';
 import { CheckInOutDto } from '../dto/check-in-out.dto.js';
 import { User } from '../../../common/decorators/user.decorator.js';
 import { FilterAttendanceDto } from '../dto/filter-attendance.dto.js';
-import { Attendance } from '../entities/attendance.entity';
+import { attendances } from 'generated/prisma/client.js';
+
 
 @ApiBearerAuth()
-@Roles(Role.EMPLOYEE)
+@Roles(roleType.EMPLOYEE)
 @Controller('employee/attendance')
 export class AttendanceEmployeeController {
   constructor(private readonly attendanceService: AttendanceEmployeeService) {}
@@ -18,7 +19,7 @@ export class AttendanceEmployeeController {
   async checkIn(
     @Body() dto: CheckInOutDto,
     @User() user: { id: number; role: string },
-  ): Promise<Attendance> {
+  ): Promise<attendances> {
     return await this.attendanceService.checkIn(user.id, dto.j_date, dto.notes);
   }
 
@@ -26,7 +27,7 @@ export class AttendanceEmployeeController {
   async checkOut(
     @Body() dto: CheckInOutDto,
     @User() user: { id: number; role: string },
-  ): Promise<Attendance> {
+  ): Promise<attendances> {
     return await this.attendanceService.checkOut(
       user.id,
       dto.j_date,
@@ -38,7 +39,7 @@ export class AttendanceEmployeeController {
   async findMyAttendance(
     @Query() filters: FilterAttendanceDto,
     @User() user: { id: number },
-  ): Promise<Attendance[]> {
+  ): Promise<attendances[]> {
     return await this.attendanceService.findMyAttendance(user.id, filters);
   }
 }
