@@ -32,6 +32,7 @@ model users {
   role roleType @default(EMPLOYEE)
   refreshTokens refresh_tokens[]
   attendances attendances[]
+  payrolls payrolls[]
 }
 
 model refresh_tokens {
@@ -53,4 +54,32 @@ model attendances {
   notes         String?  @db.VarChar(250)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+enum payrollStatus {
+  PENDING
+  PAID
+}
+
+model payrolls {
+  id Int @id @default(autoincrement())
+
+  userId Int
+  user users @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  salaryPeriod String @db.VarChar(7)
+
+  baseSalary Int
+  bonuses Int @default(0)
+  deduction Int @default(0)
+  totalAmount Int
+
+  status payrollStatus @default(PENDING)
+
+  paymentDate DateTime?
+
+  notes String? @db.VarChar(250)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
