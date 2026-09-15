@@ -9,7 +9,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { PayrollStatus } from '../enums/payroll-status.enum';
+import { payrollStatus } from '../../../../generated/prisma/enums.js';
 
 /**
  * DTO برای ایجاد رکورد حقوق و دستمزد
@@ -83,14 +83,14 @@ export class CreatePayrollDto {
 
   @ApiPropertyOptional({
     description: 'وضعیت پرداخت',
-    example: PayrollStatus.PENDING,
-    enum: PayrollStatus,
+    example: payrollStatus.PENDING,
+    enum: payrollStatus,
   })
-  @IsEnum(PayrollStatus, {
-    message: `وضعیت باید ${PayrollStatus.PAID} یا ${PayrollStatus.PENDING} باشد`,
+  @IsEnum(payrollStatus, {
+    message: `وضعیت باید ${payrollStatus.PAID} یا ${payrollStatus.PENDING} باشد`,
   })
   @IsOptional()
-  status?: PayrollStatus;
+  status?: payrollStatus;
 
   /**
    * یادداشت‌های اضافی (اختیاری)
