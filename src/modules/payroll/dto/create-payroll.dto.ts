@@ -26,7 +26,7 @@ export class CreatePayrollDto {
   @IsNumber({}, { message: 'شناسه کاربر باید یک عدد باشد' })
   @Min(1, { message: 'شناسه کاربر باید بزرگتر از صفر باشد' })
   @IsNotEmpty({ message: 'شناسه کاربر الزامی است' })
-  userId: number;
+  userId!: number;
 
   /**
    * دوره (ماه و سال)
@@ -40,7 +40,7 @@ export class CreatePayrollDto {
     message: 'فرمت دوره صحیح نیست. باید به صورت YYYY-MM باشد (مثلاً 1404/01)',
   })
   @IsNotEmpty({ message: 'دوره الزامی است' })
-  salaryPeriod: string;
+  salaryPeriod!: string;
 
   /**
    * حقوق پایه
@@ -53,7 +53,7 @@ export class CreatePayrollDto {
   @IsNumber({}, { message: 'حقوق پایه باید یک عدد باشد' })
   @Min(0, { message: 'حقوق پایه نمی‌تواند منفی باشد' })
   @IsNotEmpty({ message: 'حقوق پایه الزامی است' })
-  baseSalary: number;
+  baseSalary!: number;
 
   /**
    * پاداش‌ها (اختیاری)
