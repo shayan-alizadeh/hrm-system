@@ -72,14 +72,14 @@ export class UpdatePayrollDto {
    */
   @ApiPropertyOptional({
     description: 'وضعیت پرداخت',
-    example: PayrollStatus.PENDING,
-    enum: PayrollStatus,
+    example: payrollStatus.PENDING,
+    enum: payrollStatus,
   })
-  @IsEnum(PayrollStatus, {
-    message: `وضعیت باید ${PayrollStatus.PAID} یا ${PayrollStatus.PENDING} باشد`,
+  @IsEnum(payrollStatus, {
+    message: `وضعیت باید ${payrollStatus.PAID} یا ${payrollStatus.PENDING} باشد`,
   })
   @IsOptional()
-  status?: PayrollStatus;
+  status?: payrollStatus;
 
   /**
    * یادداشت‌های اضافی
