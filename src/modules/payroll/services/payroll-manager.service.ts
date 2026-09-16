@@ -6,6 +6,7 @@ import {
 
 import { PrismaService } from '../../../prisma/prisma.service.js';
 import { CreatePayrollDto } from '../dto/create-payroll.dto.js';
+import { UpdatePayrollDto } from '../dto/update-payroll.dto.js';
 
 import { payrollStatus } from '../../../../generated/prisma/enums.js';
 
@@ -69,6 +70,56 @@ export class PayrollManagerService {
         status: dto.status ?? payrollStatus.PENDING,
 
         notes: dto.notes ?? null,
+      },
+    });
+  }
+
+  async update(id: number, dto: UpdatePayrollDto) {
+    const payroll = await this.prisma.payrolls.findUnique({ where: { id } });
+
+    if (!payroll) {
+      throw new NotFoundException('فیش حقوقی یافت نشد');
+    }
+
+    const baseSalary = dto.baseSalary ?? payroll.baseSalary;
+    const bonuses = dto.bonuses ?? payroll.bonuses;
+    const deduction = dto.deductions ?? payroll.deduction;
+
+    const totalAmount = baseSalary + bonuses - deduction;
+
+    let paymentDate = payroll.paymentDate;
+
+    if (dto.status === payrollStatus.PAID && !payroll.paymentDate) {
+      paymentDate = new Date();
+    }
+
+    return await this.prisma.payrolls.update({
+      where: {
+        id,
+      },
+      data: {
+        ...(dto.salaryPeriod !== undefined && {
+          salaryPeriod: dto.salaryPeriod,
+        }),
+
+        ...(dto.baseSalary !== undefined && {
+          baseSalary: dto.baseSalary,
+        }),
+
+        ...(dto.bonuses !== undefined && {
+          bonuses: dto.bonuses,
+        }),
+
+        ...(dto.deductions !== undefined && {
+          deduction: dto.deductions,
+        }),
+
+        ...(dto.status !== undefined && {
+          status: dto.status,
+        }),
+
+        totalAmount,
+        paymentDate,
       },
     });
   }
