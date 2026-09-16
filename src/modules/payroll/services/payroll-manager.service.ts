@@ -158,4 +158,27 @@ export class PayrollManagerService {
       ],
     });
   }
+
+  async findOne(id: number) {
+    const payroll = await this.prisma.payrolls.findUnique({
+      where: { id },
+      include: {
+        user: true,
+      },
+    });
+
+    if (!payroll) {
+      throw new NotFoundException('فیش حقوقی مد نظر شما یافت نشد');
+    }
+
+    return payroll;
+  }
+
+  async remove(id: number) {
+    await this.findOne(id);
+
+    await this.prisma.payrolls.delete({
+      where: { id },
+    });
+  }
 }
