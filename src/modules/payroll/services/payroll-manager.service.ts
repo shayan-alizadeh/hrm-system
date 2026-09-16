@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../../../prisma/prisma.service.js';
 import { CreatePayrollDto } from '../dto/create-payroll.dto.js';
 import { UpdatePayrollDto } from '../dto/update-payroll.dto.js';
+import { FilterPayrollDto } from '../dto/filter-payroll.dto.js';
 
 import { payrollStatus } from '../../../../generated/prisma/enums.js';
 
@@ -121,6 +122,40 @@ export class PayrollManagerService {
         totalAmount,
         paymentDate,
       },
+    });
+  }
+
+  async findAll(filters: FilterPayrollDto) {
+    return await this.prisma.payrolls.findMany({
+      where: {
+        ...(filters.userId !== undefined && {
+          userId: filters.userId,
+        }),
+
+        ...(filters.salaryPeriod !== undefined && {
+          salaryPeriod: filters.salaryPeriod,
+        }),
+
+        ...(filters.status !== undefined && {
+          status:
+            filters.status === 'pending'
+              ? payrollStatus.PENDING
+              : payrollStatus.PAID,
+        }),
+      },
+
+      include: {
+        user: true,
+      },
+
+      orderBy: [
+        {
+          salaryPeriod: 'desc',
+        },
+        {
+          createdAt: 'desc',
+        },
+      ],
     });
   }
 }
