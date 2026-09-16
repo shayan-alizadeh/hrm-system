@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-
+import { Prisma } from '../../../../generated/prisma/client.js';
 import { PrismaService } from '../../../prisma/prisma.service.js';
 import { CreatePayrollDto } from '../dto/create-payroll.dto.js';
 import { UpdatePayrollDto } from '../dto/update-payroll.dto.js';
@@ -175,10 +175,19 @@ export class PayrollManagerService {
   }
 
   async remove(id: number) {
-    await this.findOne(id);
+    try {
+      await this.prisma.payrolls.delete({
+        where: { id },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
+        throw new NotFoundException('فیش حقوقی مد نظر شما یافت نشد');
+      }
 
-    await this.prisma.payrolls.delete({
-      where: { id },
-    });
+      throw error;
+    }
   }
 }
