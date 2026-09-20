@@ -4,15 +4,20 @@ import {
   UnauthorizedException,
   Injectable,
 } from '@nestjs/common';
-import { roleType } from '../../../generated/prisma/enums.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import * as bcrypt from 'bcrypt';
-import { users } from 'generated/prisma/browser.js';
+import { RoleType } from '../../../generated/prisma/enums.js';
+import { User } from '../../../generated/prisma/client.js';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class AuthService {
+  // یک هش معتبر bcrypt اما تصادفی که فقط برای اتلاف زمان (Timing) استفاده می‌شود.
+  // این هش هرگز با هیچ توکنی مچ نمی‌شود.
+  private readonly DUMMY_HASH =
+    '$2b$12$R.Hw/VvS6B/P/4g.D.W9xO1z0.bH.7a.k.6/T/S.l.Q.u.Y.O.i';
+
   constructor(
     private readonly prisma: PrismaService,
     private jwtService: JwtService,
@@ -22,50 +27,58 @@ export class AuthService {
   async register(
     mobile: string,
     password: string,
-    role: roleType = roleType.EMPLOYEE,
+    firstName: string,
+    lastName: string,
+    role: RoleType = 'EMPLOYEE',
   ) {
-    const alreadyExistMobile = await this.prisma.users.findUnique({
+    // کد قبلی register ...
+    const alreadyExistMobile = await this.prisma.user.findUnique({
       where: { mobile },
     });
 
     if (alreadyExistMobile)
-      throw new BadRequestException('شماره موبایل از قبل وجود دارد .');
+      throw new BadRequestException('شماره موبایل از قبل وجود دارد.');
 
     const passwordHashed = await bcrypt.hash(password, 12);
 
-    const user = await this.prisma.users.create({
-      data: { mobile, password: passwordHashed, role },
+    const user = await this.prisma.user.create({
+      data: { mobile, password: passwordHashed, firstName, lastName, role },
     });
 
-    return user;
+    const { password: _, ...userWithoutPassword } = user;
+    return userWithoutPassword;
   }
+
   async validateUser(mobile: string, password: string) {
-    const user = await this.prisma.users.findUnique({
-      where: {
-        mobile,
-      },
+    // کد قبلی validateUser ...
+    const user = await this.prisma.user.findUnique({
+      where: { mobile },
     });
+
     if (!user)
-      throw new NotFoundException('کاربری با این شماره موبایل یافت نشد');
+      throw new NotFoundException('کاربری با این شماره موبایل یافت نشد.');
+
+    if (!user.isActive) {
+      throw new UnauthorizedException('حساب کاربری شما غیرفعال شده است.');
+    }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid)
-      throw new UnauthorizedException('پسورد وارد شده صحیح نیست');
+      throw new UnauthorizedException('پسورد وارد شده صحیح نیست.');
 
     return user;
   }
 
-  async login(user: users) {
+  async login(user: User) {
     const payload = { sub: user.id, role: user.role };
 
-    //Access token
+    // دسترسی توکن و رفرش توکن
     const accessToken = this.jwtService.sign(payload, {
       secret: this.config.get('JWT_ACCESS_SECRET'),
       expiresIn: this.config.get('ACCESS_TOKEN_EXPIRE') || '15m',
     });
 
-    //Refresh token
     const refreshToken = this.jwtService.sign(
       { sub: user.id },
       {
@@ -75,14 +88,32 @@ export class AuthService {
     );
 
     const tokenHash = await bcrypt.hash(refreshToken, 12);
-    const rt = await this.prisma.refresh_tokens.create({
+
+    // =========================================================
+    // پیاده‌سازی Single Session (محدودیت نشست یگانه)
+    // قبل از ذخیره توکن جدید، تمام توکن‌های قبلی این کاربر را باطل می‌کنیم.
+    // =========================================================
+    await this.prisma.refreshToken.updateMany({
+      where: {
+        userId: user.id,
+        revokedAt: null, // فقط توکن‌های فعال
+      },
+      data: {
+        revokedAt: new Date(),
+      },
+    });
+
+    // حالا توکن نشست جدید را ذخیره می‌کنیم
+    await this.prisma.refreshToken.create({
       data: { tokenHash, userId: user.id },
     });
+
+    const { password: _, ...userWithoutPassword } = user;
 
     return {
       accessToken,
       refreshToken,
-      user,
+      user: userWithoutPassword,
     };
   }
 
@@ -93,76 +124,91 @@ export class AuthService {
         secret: this.config.get('JWT_REFRESH_SECRET'),
       });
     } catch {
-      throw new UnauthorizedException('Invalid refresh token!');
+      throw new UnauthorizedException(
+        'Refresh token نامعتبر یا منقضی شده است.',
+      );
     }
 
     const userId = payload.sub;
 
-    // ۱. دریافت توکن‌های فعال کاربر همراه با اطلاعات خود کاربر
-    const tokens = await this.prisma.refresh_tokens.findMany({
+    const tokens = await this.prisma.refreshToken.findMany({
       where: {
         userId: userId,
-        revokedAt: null, // فقط توکن‌هایی که باطل نشده‌اند
+        revokedAt: null,
       },
-      include: {
-        user: true,
-      },
+      include: { user: true },
     });
 
     let isValidRefreshToken = false;
+    let matchedTokenRecord: any = null;
 
-    for (const rt of tokens) {
-      const match = await bcrypt.compare(providedRefreshToken, rt.tokenHash);
+    // =========================================================
+    // پیاده‌سازی Dummy Hash برای جلوگیری از Timing Attack
+    // =========================================================
 
-      if (match) {
-        isValidRefreshToken = true;
-
-        // ۲. باطل کردن توکن فعلی (تنظیم revokedAt)
-        await this.prisma.refresh_tokens.update({
-          where: { id: rt.id },
-          data: { revokedAt: new Date() },
-        });
-
-        const user = rt.user;
-        const accessTokenPayload = { sub: user.id, role: user.role };
-
-        // Access token
-        const newAccessToken = this.jwtService.sign(accessTokenPayload, {
-          secret: this.config.get('JWT_ACCESS_SECRET'),
-          expiresIn: this.config.get('ACCESS_TOKEN_EXPIRE') || '15m',
-        });
-
-        // Refresh token
-        const newRefreshToken = this.jwtService.sign(
-          { sub: user.id },
-          {
-            secret: this.config.get('JWT_REFRESH_SECRET'),
-            expiresIn: this.config.get('REFRESH_TOKEN_EXPIRE') || '14d',
-          },
-        );
-
-        // ۳. هش و ذخیره توکن جدید در دیتابیس
-        const tokenHash = await bcrypt.hash(newRefreshToken, 12);
-        await this.prisma.refresh_tokens.create({
-          data: {
-            tokenHash: tokenHash,
-            userId: user.id,
-          },
-        });
-
-        return {
-          newAccessToken,
-          newRefreshToken,
-        };
+    if (tokens.length === 0) {
+      // اگر کاربر هیچ نشست فعالی نداشت، یک مقایسه ساختگی انجام می‌دهیم
+      // تا زمان پاسخگویی سرور طولانی شود و با حالت موفقیت‌آمیز تفاوتی نکند.
+      await bcrypt.compare(providedRefreshToken, this.DUMMY_HASH);
+    } else {
+      // اگر توکنی بود، مقایسه واقعی را انجام می‌دهیم
+      for (const rt of tokens) {
+        const match = await bcrypt.compare(providedRefreshToken, rt.tokenHash);
+        if (match) {
+          isValidRefreshToken = true;
+          matchedTokenRecord = rt;
+          break; // پیدا کردیم، از حلقه خارج می‌شویم
+        }
       }
     }
 
-    if (!isValidRefreshToken) {
-      throw new BadRequestException('توکن شما معتبر نیست');
+    if (!isValidRefreshToken || !matchedTokenRecord) {
+      throw new UnauthorizedException('توکن شما معتبر نیست');
     }
+
+    if (!matchedTokenRecord.user.isActive) {
+      throw new UnauthorizedException('حساب کاربری غیرفعال است.');
+    }
+
+    // چرخش توکن (ابطال توکن فعلی و صدور توکن جدید)
+    await this.prisma.refreshToken.update({
+      where: { id: matchedTokenRecord.id },
+      data: { revokedAt: new Date() },
+    });
+
+    const user = matchedTokenRecord.user;
+    const accessTokenPayload = { sub: user.id, role: user.role };
+
+    const newAccessToken = this.jwtService.sign(accessTokenPayload, {
+      secret: this.config.get('JWT_ACCESS_SECRET'),
+      expiresIn: this.config.get('ACCESS_TOKEN_EXPIRE') || '15m',
+    });
+
+    const newRefreshToken = this.jwtService.sign(
+      { sub: user.id },
+      {
+        secret: this.config.get('JWT_REFRESH_SECRET'),
+        expiresIn: this.config.get('REFRESH_TOKEN_EXPIRE') || '14d',
+      },
+    );
+
+    const tokenHash = await bcrypt.hash(newRefreshToken, 12);
+
+    await this.prisma.refreshToken.create({
+      data: {
+        tokenHash: tokenHash,
+        userId: user.id,
+      },
+    });
+
+    return {
+      newAccessToken,
+      newRefreshToken,
+    };
   }
+
   async logout(userId: number) {
-    await this.prisma.refresh_tokens.updateMany({
+    await this.prisma.refreshToken.updateMany({
       where: {
         userId: userId,
         revokedAt: null,
@@ -172,9 +218,10 @@ export class AuthService {
       },
     });
   }
+
   async findUserById(userId: number) {
-    const user = await this.prisma.users.findUnique({ where: { id: userId } });
-    if (!user) throw new NotFoundException('User not found');
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('کاربر یافت نشد');
     return user;
   }
 }
