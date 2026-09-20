@@ -1,5 +1,4 @@
 import {
-  IsEmail,
   IsString,
   IsEnum,
   IsOptional,
@@ -7,10 +6,29 @@ import {
   Matches,
   MinLength,
 } from 'class-validator';
-import { roleType } from '../../../../generated/prisma/enums.js';
+// توجه: آدرس ایمپورت رو به Prisma Client جدید تغییر دادم
+import { RoleType } from '../../../../generated/prisma/enums.js';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class RegisterDto {
+  // --- فیلدهای جدید اضافه شده ---
+  @ApiProperty({
+    description: 'نام کاربر',
+    example: 'علی',
+  })
+  @IsString({ message: 'نام باید یک رشته متنی باشد' })
+  @IsNotEmpty({ message: 'نام الزامی است' })
+  firstName!: string;
+
+  @ApiProperty({
+    description: 'نام خانوادگی کاربر',
+    example: 'علوی',
+  })
+  @IsString({ message: 'نام خانوادگی باید یک رشته متنی باشد' })
+  @IsNotEmpty({ message: 'نام خانوادگی الزامی است' })
+  lastName!: string;
+  // ------------------------------
+
   @ApiProperty({
     description:
       'شماره موبایل کاربر (باید با الگوی شماره موبایل ایرانی مطابقت داشته باشد)',
@@ -40,12 +58,12 @@ export class RegisterDto {
   @ApiPropertyOptional({
     description: 'نقش کاربری (MANAGER یا EMPLOYEE)',
     example: 'EMPLOYEE',
-    enum: roleType,
-    enumName: 'Role',
+    enum: RoleType, // به RoleType تغییر یافت
+    enumName: 'RoleType',
   })
   @IsOptional()
-  @IsEnum(roleType, {
-    message: 'نقش کاربری باید یکی از مقادیر manager یا employee باشد',
+  @IsEnum(RoleType, {
+    message: 'نقش کاربری باید یکی از مقادیر MANAGER یا EMPLOYEE باشد', // مقادیر به حروف بزرگ اصلاح شد
   })
-  role?: roleType;
+  role?: RoleType;
 }
