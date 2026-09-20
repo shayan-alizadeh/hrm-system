@@ -1,8 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../generated/prisma"
@@ -12,74 +10,99 @@ datasource db {
   provider = "mysql"
 }
 
-model departments {
-  id Int @id @default(autoincrement())
-  name        String   @db.VarChar(100)
-  description String?   @db.VarChar(250)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+enum RoleType {
+  MANAGER
+  EMPLOYEE
 }
 
-enum roleType {
-  MANAGER 
-  EMPLOYEE 
-}
-
-model users {
-  id Int @id @default(autoincrement())
-  mobile String @unique
-  password String
-  role roleType @default(EMPLOYEE)
-  refreshTokens refresh_tokens[]
-  attendances attendances[]
-  payrolls payrolls[]
-}
-
-model refresh_tokens {
-  id Int @id @default(autoincrement())
-  tokenHash String
-  userId Int
-  createdAt DateTime @default(now())
-  revokedAt  DateTime?
-  user users @relation(fields: [userId],references: [id])
-}
-
-model attendances {
-  id            Int      @id @default(autoincrement())
-  userId        Int
-  user          users     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  j_date        String   @db.VarChar(10)
-  checkInTime   DateTime?
-  checkOutTime  DateTime?
-  notes         String?  @db.VarChar(250)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-}
-
-enum payrollStatus {
+enum PayrollStatus {
   PENDING
   PAID
 }
 
-model payrolls {
-  id Int @id @default(autoincrement())
+model Department {
+  id          Int     @id @default(autoincrement())
+  name        String  @db.VarChar(100)
+  description String? @db.VarChar(250)
 
-  userId Int
-  user users @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  salaryPeriod String @db.VarChar(7)
-
-  baseSalary Int
-  bonuses Int @default(0)
-  deduction Int @default(0)
-  totalAmount Int
-
-  status payrollStatus @default(PENDING)
-
-  paymentDate DateTime?
-
-  notes String? @db.VarChar(250)
+  // رابطه یک به چند با کاربران
+  users User[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@map("departments") // نام جدول در دیتابیس
+}
+
+model User {
+  id           Int     @id @default(autoincrement())
+  firstName    String  @db.VarChar(50) // اضافه شده
+  lastName     String  @db.VarChar(50) // اضافه شده
+  nationalCode String? @unique @db.VarChar(10) // اضافه شده برای احراز هویت و بیمه
+  mobile       String  @unique @db.VarChar(15)
+  password     String
+  isActive     Boolean @default(true) // برای مدیریت کارمندان سابق
+
+  role RoleType @default(EMPLOYEE)
+
+  // کلید خارجی دپارتمان
+  departmentId Int?
+  department   Department? @relation(fields: [departmentId], references: [id])
+
+  refreshTokens RefreshToken[]
+  attendances   Attendance[]
+  payrolls      Payroll[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        Int    @id @default(autoincrement())
+  tokenHash String @db.VarChar(255) // طول مشخص برای هش
+  userId    Int
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade) // اضافه شدن Cascade برای خروج خودکار در صورت حذف کاربر
+
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+
+  @@map("refresh_tokens")
+}
+
+model Attendance {
+  id     Int  @id @default(autoincrement())
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  attendanceDate String    @db.VarChar(10) // مثال: 1405/06/01
+  checkInTime    DateTime?
+  checkOutTime   DateTime?
+  notes          String?   @db.VarChar(250)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("attendances")
+}
+
+model Payroll {
+  id     Int  @id @default(autoincrement())
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  payPeriod String @db.VarChar(7) // مثال: 1405-06
+
+  // تغییر به BigInt برای جلوگیری از Overflow مبالغ ریالی
+  baseSalary  BigInt
+  bonuses     BigInt @default(0)
+  deductions  BigInt @default(0) // اصلاح املایی (deduction -> deductions)
+  totalAmount BigInt
+
+  status      PayrollStatus @default(PENDING)
+  paymentDate DateTime?
+  notes       String?       @db.VarChar(250)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("payrolls")
 }
