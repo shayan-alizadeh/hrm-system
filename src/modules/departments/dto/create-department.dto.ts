@@ -1,15 +1,24 @@
 import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
-
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateDepartmentDto {
-  /** نام دپارتمان (الزامی) */
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(100)
+  @ApiProperty({
+    description: 'نام دپارتمان',
+    example: 'فناوری اطلاعات (IT)',
+    maxLength: 100,
+  })
+  @IsString({ message: 'نام دپارتمان باید یک رشته متنی باشد.' })
+  @IsNotEmpty({ message: 'وارد کردن نام دپارتمان الزامی است.' })
+  @MaxLength(100, {
+    message: 'نام دپارتمان نمی‌تواند بیشتر از ۱۰۰ کاراکتر باشد.',
+  })
   name!: string;
 
-  /** توضیحات دپارتمان (اختیاری) */
-  @IsString()
+  @ApiPropertyOptional({
+    description: 'توضیحات دپارتمان',
+    example: 'بخش توسعه نرم‌افزار و مدیریت زیرساخت شبکه‌ی سازمان',
+  })
+  @IsString({ message: 'توضیحات باید یک رشته متنی باشد.' })
   @IsOptional()
   description?: string;
 }

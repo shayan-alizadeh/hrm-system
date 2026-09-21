@@ -1,15 +1,5 @@
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { PartialType } from '@nestjs/swagger';
+import { CreateDepartmentDto } from './create-department.dto.js';
 
 
-export class UpdateDepartmentDto {
-  /** نام جدید دپارتمان */
-  @IsString()
-  @IsOptional()
-  @MaxLength(100)
-  name?: string;
-
-  /** توضیحات جدید */
-  @IsString()
-  @IsOptional()
-  description?: string;
-}
+export class UpdateDepartmentDto extends PartialType(CreateDepartmentDto) {}
