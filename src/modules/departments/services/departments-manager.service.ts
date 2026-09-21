@@ -1,62 +1,79 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { CreateDepartmentDto } from '../dto/create-department.dto.js';
 import { UpdateDepartmentDto } from '../dto/update-department.dto.js';
 import { PrismaService } from '../../../prisma/prisma.service.js';
 
-/**
- * سرویس مدیریت دپارتمان‌ها برای پنل ادمین
- * شامل عملیات CRUD کامل است
- */
 @Injectable()
 export class DepartmentsManagerService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** ایجاد دپارتمان جدید */
   async create(payload: CreateDepartmentDto) {
-    return await this.prisma.departments.create({
+    return await this.prisma.department.create({
       data: payload,
     });
   }
 
-  /** دریافت همه دپارتمان‌ها */
   async findAll() {
-    return await this.prisma.departments.findMany({
+    return await this.prisma.department.findMany({
       orderBy: {
-        createdAt: 'desc', // در پریزما از حروف کوچک برای desc/asc استفاده می‌شود
+        createdAt: 'desc',
+      },
+      // اضافه کردن تعداد کارمندان هر دپارتمان برای پنل مدیریت
+      include: {
+        _count: {
+          select: { users: true },
+        },
       },
     });
   }
 
-  /** دریافت یک دپارتمان با شناسه */
   async findOne(id: number) {
-    const department = await this.prisma.departments.findUnique({
+    const department = await this.prisma.department.findUnique({
       where: { id },
+      include: {
+        _count: {
+          select: { users: true },
+        },
+      },
     });
 
     if (!department) {
-      throw new NotFoundException(`Department with id ${id} not found`);
+      throw new NotFoundException('دپارتمانی با این شناسه یافت نشد.');
     }
 
     return department;
   }
 
-  /** به‌روزرسانی اطلاعات دپارتمان */
   async update(id: number, payload: UpdateDepartmentDto) {
-    // ابتدا بررسی می‌کنیم که دپارتمان وجود داشته باشد تا در صورت عدم وجود ارور 404 بدهد
-    await this.findOne(id);
+    await this.findOne(id); // چک کردن وجود دپارتمان
 
-    return await this.prisma.departments.update({
+    return await this.prisma.department.update({
       where: { id },
       data: payload,
     });
   }
 
-  /** حذف دپارتمان */
   async remove(id: number) {
-    // بررسی وجود دپارتمان قبل از حذف
+    // ۱. بررسی وجود دپارتمان
     await this.findOne(id);
 
-    await this.prisma.departments.delete({
+    // ۲. بررسی منطق تجاری: آیا کارمندی در این دپارتمان هست؟
+    const usersCount = await this.prisma.user.count({
+      where: { departmentId: id },
+    });
+
+    if (usersCount > 0) {
+      throw new BadRequestException(
+        `نمی‌توانید این دپارتمان را حذف کنید زیرا ${usersCount} کارمند در آن عضو هستند. ابتدا کارمندان را منتقل کنید.`,
+      );
+    }
+
+    // ۳. حذف دپارتمان
+    await this.prisma.department.delete({
       where: { id },
     });
   }
