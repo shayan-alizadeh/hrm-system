@@ -4,10 +4,10 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { AuthService } from '../auth.service.js';
 import { ConfigService } from '@nestjs/config';
 
-// تعریف تایپ برای پی‌لود تا از any جلوگیری کنیم
 interface JwtPayload {
   sub: number;
   role: string;
+  tv: number; // اضافه شدن tokenVersion به تایپ پی‌لود
 }
 
 @Injectable()
@@ -18,21 +18,25 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      ignoreExpiration: false, // حتماً اکسپایر شدن رو چک کن
+      ignoreExpiration: false,
       secretOrKey: configService.get('JWT_ACCESS_SECRET'),
     });
   }
 
   async validate(payload: JwtPayload) {
-    // پیدا کردن کاربر از دیتابیس
     const user = await this.authService.findUserById(payload.sub);
 
-    // چک امنیتی مهم: اگر حساب کارمند مسدود یا پاک شده بود، دسترسی قطع شود
     if (!user || !user.isActive) {
       throw new UnauthorizedException('حساب کاربری شما غیرفعال شده است.');
     }
 
-    // این آبجکت درون req.user قرار می‌گیرد
+    // مقایسه tokenVersion داخل توکن با دیتابیس
+    if (user.tokenVersion !== payload.tv) {
+      throw new UnauthorizedException(
+        'توکن شما نامعتبر شده است. لطفاً دوباره وارد شوید.',
+      );
+    }
+
     return { id: user.id, role: user.role };
   }
 }
