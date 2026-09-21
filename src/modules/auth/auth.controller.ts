@@ -61,8 +61,8 @@ export class AuthController {
     const tokens = await this.authService.refreshToken(dto.refreshToken);
 
     return {
-      accessToken: tokens.newAccessToken,
-      refreshToken: tokens.newRefreshToken,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
     };
   }
 
