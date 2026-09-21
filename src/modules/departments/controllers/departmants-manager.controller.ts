@@ -14,7 +14,7 @@ import { CreateDepartmentDto } from '../dto/create-department.dto.js';
 import { UpdateDepartmentDto } from '../dto/update-department.dto.js';
 // import { Department } from '../entities/department.entity';
 import { ApiBearerAuth } from '@nestjs/swagger';
-import { roleType } from '../../../../generated/prisma/enums.js';
+import { RoleType } from '../../../../generated/prisma/enums.js';
 import { Roles } from '../../../modules/auth/decorators/roles.decorator.js';
 
 /**
@@ -23,7 +23,7 @@ import { Roles } from '../../../modules/auth/decorators/roles.decorator.js';
  */
 // api.hrsystem.ir/manager
 @ApiBearerAuth()
-@Roles(roleType.MANAGER)
+@Roles(RoleType.MANAGER)
 @Controller('manager/departments')
 export class DepartmentsManagerController {
   constructor(private readonly departmentsService: DepartmentsManagerService) {}

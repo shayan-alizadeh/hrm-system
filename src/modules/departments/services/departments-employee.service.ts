@@ -1,29 +1,35 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service.js';
 
-/**
- * سرویس مخصوص کارمندان برای مشاهده دپارتمان‌ها
- * این سرویس فقط عملیات Read را فراهم می‌کند
- */
 @Injectable()
 export class DepartmentsEmployeeService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** دریافت تمام دپارتمان‌ها */
   async findAll() {
-    return await this.prisma.departments.findMany({
+    // اصلاح نام مدل به department
+    return await this.prisma.department.findMany({
       orderBy: { name: 'asc' },
+      // کارمندان فقط به نام و توضیحات نیاز دارند (بهینه‌سازی کوئری)
+      select: {
+        id: true,
+        name: true,
+        description: true,
+      },
     });
   }
 
-  /** دریافت یک دپارتمان با شناسه */
   async findOne(id: number) {
-    const department = await this.prisma.departments.findUnique({
+    const department = await this.prisma.department.findUnique({
       where: { id },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+      },
     });
 
     if (!department) {
-      throw new NotFoundException(`Department with id ${id} not found`);
+      throw new NotFoundException('دپارتمانی با این شناسه یافت نشد.');
     }
 
     return department;
