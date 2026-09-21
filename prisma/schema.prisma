@@ -42,6 +42,7 @@ model User {
   mobile       String  @unique @db.VarChar(15)
   password     String
   isActive     Boolean @default(true) // برای مدیریت کارمندان سابق
+  tokenVersion Int      @default(1)
 
   role RoleType @default(EMPLOYEE)
 
