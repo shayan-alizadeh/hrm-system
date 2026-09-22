@@ -1,23 +1,17 @@
 import { IsOptional, IsString, Matches } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
-/**
- * DTO برای ثبت ورود یا خروج
- */
 export class CheckInOutDto {
-  /**
-   * یادداشت اختیاری
-   */
   @ApiPropertyOptional({
     description: 'یادداشت اختیاری برای ورود یا خروج',
-    example: 'ورود با تاخیر به دلیل ترافیک',
+    example: 'ورود با تاخیر به دلیل ترافیک سنگین',
   })
   @IsString({ message: 'یادداشت باید یک رشته متنی باشد' })
   @IsOptional()
   notes?: string;
 
   @ApiPropertyOptional({
-    description: 'تاریخ روز را ارسال کنید',
+    description: 'تاریخ شمسی روز کاری',
     example: '1404/09/26',
   })
   @IsString({ message: 'تاریخ باید یک رشته متنی باشد' })
@@ -25,5 +19,5 @@ export class CheckInOutDto {
     message: 'فرمت تاریخ نامعتبر است. فرمت صحیح: yyyy/mm/dd (مثال: 1404/09/26)',
   })
   @IsOptional()
-  j_date!: string;
+  attendanceDate?: string; // تغییر j_date به attendanceDate و استفاده از ?
 }
