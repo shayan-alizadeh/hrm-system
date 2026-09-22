@@ -1,37 +1,36 @@
-import { IsOptional, IsString, Matches } from 'class-validator';
+import { IsOptional, IsString, Matches, IsInt } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 
-/**
- * DTO برای فیلتر کردن حضور و غیاب
- */
 export class FilterAttendanceDto {
-  /**
-   * زمان شروع (timestamp)
-   */
   @ApiPropertyOptional({
-    description: 'تاریخ روز شروع',
+    description: 'شناسه کاربر (مخصوص پنل مدیریت برای فیلتر کردن کارمندان)',
+    example: 5,
+  })
+  @IsOptional()
+  @Type(() => Number) // تبدیل استرینگِ کوئری‌ارل به عدد
+  @IsInt({ message: 'شناسه کاربر باید عدد باشد' })
+  userId?: number;
+
+  @ApiPropertyOptional({
+    description: 'تاریخ شمسی شروع بازه',
     example: '1404/09/01',
   })
-  @IsString({ message: 'فرمت زمان شروع صحیح نیست' })
+  @IsString({ message: 'فرمت تاریخ شروع صحیح نیست' })
   @Matches(/^(13|14)\d{2}\/(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])$/, {
-    message:
-      'فرمت تاریخ شروع نامعتبر است. فرمت صحیح: yyyy/mm/dd (مثال: 1404/09/26)',
+    message: 'فرمت تاریخ شروع نامعتبر است. فرمت صحیح: yyyy/mm/dd',
   })
   @IsOptional()
-  startTime?: string;
+  startDate?: string; // تغییر از startTime به startDate
 
-  /**
-   * زمان پایان (timestamp)
-   */
   @ApiPropertyOptional({
-    description: 'تاریخ روز پایان',
+    description: 'تاریخ شمسی پایان بازه',
     example: '1404/09/31',
   })
-  @IsString({ message: 'فرمت زمان پایان صحیح نیست' })
+  @IsString({ message: 'فرمت تاریخ پایان صحیح نیست' })
   @Matches(/^(13|14)\d{2}\/(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])$/, {
-    message:
-      'فرمت تاریخ پایان نامعتبر است. فرمت صحیح: yyyy/mm/dd (مثال: 1404/09/26)',
+    message: 'فرمت تاریخ پایان نامعتبر است. فرمت صحیح: yyyy/mm/dd',
   })
   @IsOptional()
-  endTime?: string;
+  endDate?: string; // تغییر از endTime به endDate
 }
