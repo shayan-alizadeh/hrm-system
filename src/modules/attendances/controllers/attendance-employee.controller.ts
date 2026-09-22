@@ -1,9 +1,7 @@
 import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
-import { Roles } from '../../../common/decorators/roles.decorator';
-import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard'; // گارد احراز هویت
-import { RolesGuard } from '../../../common/guards/roles.guard'; // گارد بررسی نقش
-import { RoleType } from '../../../../generated/prisma/enums.js'; // ایمپورت‌های استاندارد دیتابیس
+import { Roles } from '../../auth/decorators/roles.decorator.js';
+import { RoleType } from '../../../../generated/prisma/enums.js'; 
 import { Attendance } from '../../../../generated/prisma/client.js';
 import { AttendanceEmployeeService } from '../services/attendance-employee.service.js';
 import { CheckInOutDto } from '../dto/check-in-out.dto.js';
@@ -12,7 +10,6 @@ import { FilterAttendanceDto } from '../dto/filter-attendance.dto.js';
 
 @ApiTags('Attendance - Employee') // مرتب‌سازی در Swagger
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard) // ⚠️ اضافه شدن گاردهای امنیتی الزامی
 @Roles(RoleType.EMPLOYEE)
 @Controller('employee/attendance')
 export class AttendanceEmployeeController {

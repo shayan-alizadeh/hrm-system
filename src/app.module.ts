@@ -1,6 +1,4 @@
 import { Module } from '@nestjs/common';
-import { AppController } from './app.controller.js';
-import { AppService } from './app.service.js';
 import { ConfigModule } from '@nestjs/config';
 import { DepartmentModule } from './modules/departments/department.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
@@ -21,9 +19,8 @@ import { AttendanceModule } from './modules/attendances/attendance.module.js';
     AuthModule,
     AttendanceModule,
   ],
-  controllers: [AppController],
+  controllers: [],
   providers: [
-    AppService,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],

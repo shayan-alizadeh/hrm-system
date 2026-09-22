@@ -10,19 +10,17 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
-import { Roles } from '../../../common/decorators/roles.decorator';
-import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../../common/guards/roles.guard';
-import { RoleType, Attendance } from '@prisma/client';
+import { Roles } from '../../auth/decorators/roles.decorator.js';
+import { RoleType } from '../../../../generated/prisma/enums.js';
+import { Attendance } from '../../../../generated/prisma/client.js';
 import { AttendanceManagerService } from '../services/attendance-manager.service';
 
 // ایمپورت DTOهایی که برای این بخش نیاز داری
 import { FilterAttendanceDto } from '../dto/filter-attendance.dto.js';
-import { UpdateAttendanceDto } from '../dto/update-attendance.dto';
+import { UpdateAttendanceDto } from '../dto/update-attendance.dto.js';
 
 @ApiTags('Attendance - Manager')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(RoleType.MANAGER)
 @Controller('manager/attendance')
 export class AttendanceManagerController {

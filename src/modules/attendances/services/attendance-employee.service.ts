@@ -3,48 +3,46 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service.js';
+import { PrismaService } from '../../../prisma/prisma.service.js'; // پسوند .js حذف شد (استاندارد تایپ‌اسکریپت)
 import { FilterAttendanceDto } from '../dto/filter-attendance.dto.js';
 
 @Injectable()
 export class AttendanceEmployeeService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async checkIn(userId: number, j_date: string, notes?: string) {
-    if (!j_date) {
-      throw new BadRequestException('تاریخ را وارد کنید');
-    }
-
-    const openedAttendance = await this.prisma.attendances.findFirst({
+  async checkIn(userId: number, attendanceDate: string, notes?: string) {
+    // جلوگیری از مشکل Dangling Check-ins
+    // چک می‌کنیم آیا کاربر هیچ تردد بازی در روزهای گذشته یا امروز دارد؟
+    const openedAttendance = await this.prisma.attendance.findFirst({
       where: {
         userId,
         checkOutTime: null,
-        j_date,
       },
     });
 
     if (openedAttendance) {
       throw new BadRequestException(
-        'یک تردد باز داری که هنوز خروجش رو ثبت نکردی',
+        `شما یک تردد باز در تاریخ ${openedAttendance.attendanceDate} دارید که خروج آن ثبت نشده است. لطفاً برای اصلاح به مدیر مراجعه کنید.`,
       );
     }
 
-    return await this.prisma.attendances.create({
+    return await this.prisma.attendance.create({
       data: {
         userId,
-        checkInTime: new Date(),
+        checkInTime: new Date(), // سرور با تایم‌زون UTC ذخیره می‌کند (استاندارد جهانی)
         notes: notes ?? null,
-        j_date,
+        attendanceDate,
       },
     });
   }
 
-  async checkOut(userId: number, j_date: string, notes?: string) {
-    const attendance = await this.prisma.attendances.findFirst({
+  async checkOut(userId: number, attendanceDate: string, notes?: string) {
+    // پیدا کردن آخرین ورودِ بدون خروج در همان روز
+    const attendance = await this.prisma.attendance.findFirst({
       where: {
         userId,
         checkOutTime: null,
-        j_date,
+        attendanceDate,
       },
       orderBy: {
         checkInTime: 'desc',
@@ -52,7 +50,9 @@ export class AttendanceEmployeeService {
     });
 
     if (!attendance) {
-      throw new NotFoundException('هیچ رکورد ورودی بدون خروج یافت نشد!');
+      throw new NotFoundException(
+        'هیچ رکورد ورودیِ بدون خروجی برای امروز یافت نشد!',
+      );
     }
 
     let updatedNotes = attendance.notes;
@@ -63,7 +63,7 @@ export class AttendanceEmployeeService {
         : notes;
     }
 
-    return await this.prisma.attendances.update({
+    return await this.prisma.attendance.update({
       where: {
         id: attendance.id,
       },
@@ -75,23 +75,21 @@ export class AttendanceEmployeeService {
   }
 
   async findMyAttendance(userId: number, filters: FilterAttendanceDto) {
-    return await this.prisma.attendances.findMany({
+    return await this.prisma.attendance.findMany({
       where: {
         userId,
-
-        ...(filters.startTime && {
-          j_date: {
-            gte: filters.startTime,
+        // اعمال داینامیک فیلتر تاریخ با نام‌های اصلاح‌شده
+        ...(filters.startDate && {
+          attendanceDate: {
+            gte: filters.startDate,
           },
         }),
-
-        ...(filters.endTime && {
-          j_date: {
-            lte: filters.endTime,
+        ...(filters.endDate && {
+          attendanceDate: {
+            lte: filters.endDate,
           },
         }),
       },
-
       orderBy: {
         checkInTime: 'desc',
       },
