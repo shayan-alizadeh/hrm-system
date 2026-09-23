@@ -1,14 +1,16 @@
-import { IsOptional, IsInt, IsString, Matches, Min } from 'class-validator';
+import {
+  IsOptional,
+  IsInt,
+  IsString,
+  Matches,
+  Min,
+  IsEnum,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { PayrollStatus } from '../../../../generated/prisma/enums.js'; 
 
-/**
- * DTO برای فیلتر کردن حقوق و دستمزد
- */
 export class FilterPayrollDto {
-  /**
-   * شناسه کاربر (برای مدیران)
-   */
   @ApiPropertyOptional({
     description: 'شناسه کاربر (فقط برای مدیران)',
     example: 1,
@@ -19,28 +21,23 @@ export class FilterPayrollDto {
   @IsOptional()
   userId?: number;
 
-  /**
-   * دوره (ماه و سال)
-   */
   @ApiPropertyOptional({
-    description: 'دوره حقوق (فرمت: YYYY-MM)',
+    description: 'دوره حقوق (فرمت: YYYY/MM)',
     example: '1404/08',
   })
   @IsString({ message: 'دوره باید یک رشته متنی باشد' })
   @Matches(/^\d{4}\/\d{2}$/, {
-    message: 'فرمت دوره صحیح نیست. باید به صورت YYYY-MM باشد (مثلاً 1404/01)',
+    message: 'فرمت دوره صحیح نیست. باید به صورت YYYY/MM باشد',
   })
   @IsOptional()
   salaryPeriod?: string;
 
-  /**
-   * وضعیت پرداخت
-   */
   @ApiPropertyOptional({
     description: 'وضعیت پرداخت',
-    example: 'paid',
-    enum: ['pending', 'paid'],
+    example: PayrollStatus.PENDING,
+    enum: PayrollStatus,
   })
+  @IsEnum(PayrollStatus, { message: 'وضعیت پرداخت فیلتر نامعتبر است' })
   @IsOptional()
-  status?: 'pending' | 'paid';
+  status?: PayrollStatus;
 }
