@@ -1,193 +1,140 @@
 import {
-  BadRequestException,
   Injectable,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
-import { Prisma } from '../../../../generated/prisma/client.js';
 import { PrismaService } from '../../../prisma/prisma.service.js';
 import { CreatePayrollDto } from '../dto/create-payroll.dto.js';
 import { UpdatePayrollDto } from '../dto/update-payroll.dto.js';
 import { FilterPayrollDto } from '../dto/filter-payroll.dto.js';
-
-import { payrollStatus } from '../../../../generated/prisma/enums.js';
+import { PayrollStatus } from '../../../../generated/prisma/enums.js';
 
 @Injectable()
 export class PayrollManagerService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * متد کمکی برای تبدیل BigInt به Number جهت جلوگیری از کرش شدن JSON
+   */
+  private serializePayroll(payroll: any) {
+    if (!payroll) return null;
+    return {
+      ...payroll,
+      baseSalary: Number(payroll.baseSalary),
+      bonuses: Number(payroll.bonuses),
+      deductions: Number(payroll.deductions),
+      totalAmount: Number(payroll.totalAmount),
+    };
+  }
+
   async create(dto: CreatePayrollDto) {
-    // بررسی وجود کاربر
-    const user = await this.prisma.users.findUnique({
-      where: {
-        id: dto.userId,
-      },
-    });
-
-    if (!user) {
-      throw new NotFoundException('کاربر یافت نشد');
-    }
-
-    // بررسی اینکه برای این کاربر و این دوره قبلاً فیش ثبت نشده باشد
-    const existing = await this.prisma.payrolls.findFirst({
+    // ۱. بررسی اینکه برای این کاربر در این ماه فیش تکراری صادر نشود
+    const existingPayroll = await this.prisma.payroll.findFirst({
       where: {
         userId: dto.userId,
-        salaryPeriod: dto.salaryPeriod,
+        payPeriod: dto.payPeriod, // فرض بر این است که در DTO به payPeriod تغییر نام دادی
       },
     });
 
-    if (existing) {
+    if (existingPayroll) {
       throw new BadRequestException(
-        'برای این دوره قبلا فیش حقوقی صادر شده است',
+        'برای این کاربر در این دوره قبلاً فیش حقوقی صادر شده است.',
       );
     }
 
-    // محاسبه مبالغ
+    // ۲. محاسبه مبلغ کل (Total Amount)
     const bonuses = dto.bonuses || 0;
-    const deduction = dto.deductions || 0;
+    const deductions = dto.deductions || 0;
+    const totalAmount = dto.baseSalary + bonuses - deductions;
 
-    const totalAmount = dto.baseSalary + bonuses - deduction;
-
-    // تاریخ پرداخت
-    let paymentDate: Date | null = null;
-
-    if (dto.status === payrollStatus.PAID) {
-      paymentDate = new Date();
-    }
-
-    // ایجاد فیش حقوقی
-    return await this.prisma.payrolls.create({
+    // ۳. ایجاد رکورد در دیتابیس
+    const newPayroll = await this.prisma.payroll.create({
       data: {
         userId: dto.userId,
-
-        salaryPeriod: dto.salaryPeriod,
-
+        payPeriod: dto.payPeriod,
         baseSalary: dto.baseSalary,
         bonuses,
-        deduction,
+        deductions,
         totalAmount,
-
-        paymentDate,
-
-        status: dto.status ?? payrollStatus.PENDING,
-
-        notes: dto.notes ?? null,
+        status: dto.status || PayrollStatus.PENDING,
+        notes: dto.notes,
+        // اگر وضعیت پرداخت شده بود، تاریخ پرداخت امروز ثبت شود
+        ...(dto.status === PayrollStatus.PAID && { paymentDate: new Date() }),
       },
     });
-  }
 
-  async update(id: number, dto: UpdatePayrollDto) {
-    const payroll = await this.prisma.payrolls.findUnique({ where: { id } });
-
-    if (!payroll) {
-      throw new NotFoundException('فیش حقوقی یافت نشد');
-    }
-
-    const baseSalary = dto.baseSalary ?? payroll.baseSalary;
-    const bonuses = dto.bonuses ?? payroll.bonuses;
-    const deduction = dto.deductions ?? payroll.deduction;
-
-    const totalAmount = baseSalary + bonuses - deduction;
-
-    let paymentDate = payroll.paymentDate;
-
-    if (dto.status === payrollStatus.PAID && !payroll.paymentDate) {
-      paymentDate = new Date();
-    }
-
-    return await this.prisma.payrolls.update({
-      where: {
-        id,
-      },
-      data: {
-        ...(dto.salaryPeriod !== undefined && {
-          salaryPeriod: dto.salaryPeriod,
-        }),
-
-        ...(dto.baseSalary !== undefined && {
-          baseSalary: dto.baseSalary,
-        }),
-
-        ...(dto.bonuses !== undefined && {
-          bonuses: dto.bonuses,
-        }),
-
-        ...(dto.deductions !== undefined && {
-          deduction: dto.deductions,
-        }),
-
-        ...(dto.status !== undefined && {
-          status: dto.status,
-        }),
-
-        totalAmount,
-        paymentDate,
-      },
-    });
+    return this.serializePayroll(newPayroll);
   }
 
   async findAll(filters: FilterPayrollDto) {
-    return await this.prisma.payrolls.findMany({
+    const payrolls = await this.prisma.payroll.findMany({
       where: {
-        ...(filters.userId !== undefined && {
-          userId: filters.userId,
-        }),
-
-        ...(filters.salaryPeriod !== undefined && {
-          salaryPeriod: filters.salaryPeriod,
-        }),
-
-        ...(filters.status !== undefined && {
-          status:
-            filters.status === 'pending'
-              ? payrollStatus.PENDING
-              : payrollStatus.PAID,
-        }),
+        ...(filters.userId && { userId: filters.userId }),
+        ...(filters.payPeriod && { payPeriod: filters.payPeriod }),
+        ...(filters.status && { status: filters.status }),
       },
-
       include: {
-        user: true,
+        user: {
+          select: { id: true, firstName: true, lastName: true },
+        },
       },
-
-      orderBy: [
-        {
-          salaryPeriod: 'desc',
-        },
-        {
-          createdAt: 'desc',
-        },
-      ],
+      orderBy: { createdAt: 'desc' },
     });
+
+    // مپ کردن تمام آرایه برای تبدیل BigIntها
+    return payrolls.map((p) => this.serializePayroll(p));
   }
 
   async findOne(id: number) {
-    const payroll = await this.prisma.payrolls.findUnique({
+    const payroll = await this.prisma.payroll.findUnique({
       where: { id },
       include: {
-        user: true,
+        user: {
+          select: { id: true, firstName: true, lastName: true },
+        },
       },
     });
 
-    if (!payroll) {
-      throw new NotFoundException('فیش حقوقی مد نظر شما یافت نشد');
+    if (!payroll) throw new NotFoundException('فیش حقوقی یافت نشد.');
+    return this.serializePayroll(payroll);
+  }
+
+  async update(id: number, dto: UpdatePayrollDto) {
+    const existing = await this.prisma.payroll.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('فیش حقوقی یافت نشد.');
+
+    // محاسبه مجدد مبلغ کل در صورت تغییر مبالغ پایه، پاداش یا کسورات
+    const baseSalary = dto.baseSalary ?? Number(existing.baseSalary);
+    const bonuses = dto.bonuses ?? Number(existing.bonuses);
+    const deductions = dto.deductions ?? Number(existing.deductions);
+    const totalAmount = baseSalary + bonuses - deductions;
+
+    let paymentDate = existing.paymentDate;
+    if (
+      dto.status === PayrollStatus.PAID &&
+      existing.status !== PayrollStatus.PAID
+    ) {
+      paymentDate = new Date(); // تغییر وضعیت به پرداخت‌شده
+    } else if (dto.status === PayrollStatus.PENDING) {
+      paymentDate = null; // برگشت به حالت در انتظار
     }
 
-    return payroll;
+    const updated = await this.prisma.payroll.update({
+      where: { id },
+      data: {
+        ...dto,
+        totalAmount,
+        paymentDate,
+      },
+    });
+
+    return this.serializePayroll(updated);
   }
 
   async remove(id: number) {
-    try {
-      await this.prisma.payrolls.delete({
-        where: { id },
-      });
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2025'
-      ) {
-        throw new NotFoundException('فیش حقوقی مد نظر شما یافت نشد');
-      }
+    const existing = await this.prisma.payroll.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('فیش حقوقی یافت نشد.');
 
-      throw error;
-    }
+    await this.prisma.payroll.delete({ where: { id } });
   }
 }
