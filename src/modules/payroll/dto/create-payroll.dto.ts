@@ -25,7 +25,7 @@ export class CreatePayrollDto {
     message: 'فرمت دوره صحیح نیست. باید به صورت YYYY/MM باشد (مثلاً 1404/01)',
   })
   @IsNotEmpty({ message: 'دوره الزامی است' })
-  salaryPeriod!: string;
+  payPeriod!: string;
 
   @ApiProperty({ description: 'حقوق پایه', example: 5000000 })
   @Type(() => Number)

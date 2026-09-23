@@ -30,7 +30,7 @@ export class FilterPayrollDto {
     message: 'فرمت دوره صحیح نیست. باید به صورت YYYY/MM باشد',
   })
   @IsOptional()
-  salaryPeriod?: string;
+  payPeriod?: string;
 
   @ApiPropertyOptional({
     description: 'وضعیت پرداخت',
