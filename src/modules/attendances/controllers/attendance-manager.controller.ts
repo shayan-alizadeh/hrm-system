@@ -13,7 +13,7 @@ import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Roles } from '../../auth/decorators/roles.decorator.js';
 import { RoleType } from '../../../../generated/prisma/enums.js';
 import { Attendance } from '../../../../generated/prisma/client.js';
-import { AttendanceManagerService } from '../services/attendance-manager.service';
+import { AttendanceManagerService } from '../services/attendance-manager.service.js';
 
 // ایمپورت DTOهایی که برای این بخش نیاز داری
 import { FilterAttendanceDto } from '../dto/filter-attendance.dto.js';
