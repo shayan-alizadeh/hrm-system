@@ -8,10 +8,14 @@ import { CreatePayrollDto } from '../dto/create-payroll.dto.js';
 import { UpdatePayrollDto } from '../dto/update-payroll.dto.js';
 import { FilterPayrollDto } from '../dto/filter-payroll.dto.js';
 import { PayrollStatus } from '../../../../generated/prisma/enums.js';
+import {PayrollCalculatorService} from '../services/payroll-calculator.service.js'
 
 @Injectable()
 export class PayrollManagerService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly calculatorService: PayrollCalculatorService,
+  ) {}
 
   /**
    * متد کمکی برای تبدیل BigInt به Number جهت جلوگیری از کرش شدن JSON
@@ -32,7 +36,7 @@ export class PayrollManagerService {
     const existingPayroll = await this.prisma.payroll.findFirst({
       where: {
         userId: dto.userId,
-        payPeriod: dto.payPeriod, 
+        payPeriod: dto.payPeriod,
       },
     });
 
