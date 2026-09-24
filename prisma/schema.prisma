@@ -181,3 +181,14 @@ model LeaveRequest {
 
   @@map("leave_requests")
 }
+
+model Holiday {
+  id          Int      @id @default(autoincrement())
+  date        String   @unique @db.VarChar(10) // فرمت: 1404/01/01 (یونیک برای جلوگیری از ثبت تکراری)
+  title       String   @db.VarChar(100)        // مثلا: عید نوروز
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("holidays")
+}

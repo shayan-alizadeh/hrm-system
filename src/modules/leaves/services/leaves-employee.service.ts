@@ -7,6 +7,7 @@ import { PrismaService } from '../../../prisma/prisma.service.js';
 import { CreateLeaveRequestDto } from '../dto/create-leave-request.dto.js';
 import { FilterLeavesDto } from '../dto/filter-leaves.dto.js';
 import { LeaveStatus, LeaveType } from '../../../../generated/prisma/client.js';
+import * as moment from 'moment-jalaali';
 
 @Injectable()
 export class LeavesEmployeeService {
@@ -23,70 +24,95 @@ export class LeavesEmployeeService {
     return Number(formatter.format(new Date()));
   }
 
-  /**
-   * استخراج سال از تاریخ شمسی (مثلاً "1404/09/01" <- 1404)
-   */
   private extractYearFromDate(dateStr: string): number {
     return parseInt(dateStr.split('/')[0], 10);
   }
 
   /**
-   * الگوریتم محاسبه تعداد روزهای مرخصی (نسخه ساده‌شده)
-   * توجه: در نسخه Production برای محاسبه مرخصی‌هایی که بین دو ماه مختلف هستند (مثلاً از ۲۹ آبان تا ۲ آذر)
-   * حتماً از پکیج‌هایی مثل jalali-moment یا date-fns-jalali استفاده کنید.
+   * محاسبه روزهای خالص مرخصی با کسر جمعه‌ها و تعطیلات رسمی دیتابیس
+   * توجه: متد به async تغییر یافت
    */
-  private calculateTotalDays(startDate: string, endDate: string): number {
-    const startDay = parseInt(startDate.split('/')[2], 10);
-    const endDay = parseInt(endDate.split('/')[2], 10);
+  private async calculateTotalDays(
+    startDate: string,
+    endDate: string,
+  ): Promise<number> {
+    const start = moment(startDate, 'jYYYY/jMM/jDD');
+    const end = moment(endDate, 'jYYYY/jMM/jDD');
 
-    const diff = endDay - startDay + 1;
-    if (diff < 1) {
+    if (!start.isValid() || !end.isValid()) {
+      throw new BadRequestException('فرمت تاریخ نامعتبر است.');
+    }
+
+    if (end.isBefore(start)) {
       throw new BadRequestException(
-        'تاریخ پایان نمی‌تواند قبل از تاریخ شروع باشد (یا مرخصی بین دو ماه متفاوت است).',
+        'تاریخ پایان نمی‌تواند قبل از تاریخ شروع باشد.',
       );
     }
 
-    // کسر یک روز به ازای هر ۷ روز (محاسبه حدودی جمعه‌ها)
-    const fridays = Math.floor(diff / 7);
-    return diff - fridays;
+    // ۱. دریافت تعطیلات رسمیِ بین تاریخ شروع و پایان از دیتابیس
+    // چون تاریخ‌ها را با فرمت YYYY/MM/DD و صفرِ پشت اعداد (Padding) ذخیره کردیم،
+    // مقایسه رشته‌ای (String Comparison) در دیتابیس کاملاً دقیق کار می‌کند.
+    const holidays = await this.prisma.holiday.findMany({
+      where: {
+        date: {
+          gte: startDate, // بزرگتر مساوی تاریخ شروع
+          lte: endDate, // کوچکتر مساوی تاریخ پایان
+        },
+      },
+      select: { date: true },
+    });
+
+    // تبدیل به یک آرایه ساده از تاریخ‌ها برای جستجوی سریع (مثلاً ['1404/01/01', ...])
+    const holidayDates = holidays.map((h) => h.date);
+
+    let workingDays = 0;
+    const currentDay = start.clone(); // کپی برای جلوگیری از تغییر متغیر اصلی
+
+    // ۲. حلقه برای بررسی تک‌تک روزهای مرخصی
+    while (currentDay.isSameOrBefore(end)) {
+      const currentDateString = currentDay.format('jYYYY/jMM/jDD'); // فرمت کردن دقیق با صفر
+      const isFriday = currentDay.day() === 5; // عدد 5 در moment.js یعنی جمعه
+      const isOfficialHoliday = holidayDates.includes(currentDateString); // آیا در لیست دیتابیس هست؟
+
+      // فقط در صورتی که نه جمعه باشد و نه تعطیل رسمی، یک روز به مرخصی اضافه می‌شود
+      if (!isFriday && !isOfficialHoliday) {
+        workingDays++;
+      }
+
+      currentDay.add(1, 'days'); // رفتن به روز بعدی
+    }
+
+    // اگر کل روزهای درخواستی تعطیل بود (مثلاً مرخصی فقط برای روز جمعه ثبت شده)
+    if (workingDays === 0) {
+      throw new BadRequestException(
+        'بازه انتخابی شما تماماً در روزهای تعطیل قرار دارد.',
+      );
+    }
+
+    return workingDays;
   }
 
-  // اضافه شدن پارامتر year به صورت Optional
   async getMyBalance(userId: number, year?: number) {
+    // ... کدهای این بخش بدون تغییر باقی می‌ماند (مشابه قبل) ...
     const targetYear = year || this.getCurrentJalaliYear();
 
     let balance = await this.prisma.leaveBalance.findUnique({
-      where: {
-        // استفاده از سینتکس کلید ترکیبی در Prisma
-        userId_year: {
-          userId,
-          year: targetYear,
-        },
-      },
+      where: { userId_year: { userId, year: targetYear } },
     });
 
     if (!balance) {
       balance = await this.prisma.leaveBalance.create({
-        data: {
-          userId,
-          year: targetYear,
-          totalDays: 26,
-          usedDays: 0,
-        },
+        data: { userId, year: targetYear, totalDays: 26, usedDays: 0 },
       });
     }
-
     return balance;
   }
 
-  // اصلاح متد ثبت درخواست
   async createRequest(userId: number, dto: CreateLeaveRequestDto) {
-    const totalDays = this.calculateTotalDays(dto.startDate, dto.endDate);
+    // نکته مهم: اینجا await اضافه شد چون متد بالا async شده است
+    const totalDays = await this.calculateTotalDays(dto.startDate, dto.endDate);
 
-    // استخراج سال از تاریخ شروع درخواست مرخصی
     const requestYear = this.extractYearFromDate(dto.startDate);
-
-    // دریافت موجودی کارمند دقیقاً برای همان سالِ درخواست
     const balance = await this.getMyBalance(userId, requestYear);
 
     if (dto.leaveType === LeaveType.ANNUAL) {
@@ -104,7 +130,7 @@ export class LeavesEmployeeService {
         leaveType: dto.leaveType,
         startDate: dto.startDate,
         endDate: dto.endDate,
-        totalDays, // ثبت روزهای محاسبه شده در سرور
+        totalDays,
         reason: dto.reason,
         status: LeaveStatus.PENDING,
       },
