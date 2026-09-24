@@ -7,7 +7,7 @@ import { PrismaService } from '../../../prisma/prisma.service.js';
 import { CreateLeaveRequestDto } from '../dto/create-leave-request.dto.js';
 import { FilterLeavesDto } from '../dto/filter-leaves.dto.js';
 import { LeaveStatus, LeaveType } from '../../../../generated/prisma/client.js';
-import * as moment from 'moment-jalaali';
+import moment from 'moment-jalaali';
 
 @Injectable()
 export class LeavesEmployeeService {
