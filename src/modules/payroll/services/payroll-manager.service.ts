@@ -32,7 +32,7 @@ export class PayrollManagerService {
     const existingPayroll = await this.prisma.payroll.findFirst({
       where: {
         userId: dto.userId,
-        payPeriod: dto.payPeriod, // فرض بر این است که در DTO به payPeriod تغییر نام دادی
+        payPeriod: dto.payPeriod, 
       },
     });
 

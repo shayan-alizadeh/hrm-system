@@ -6,8 +6,8 @@ import {  Payroll } from '../../../../generated/prisma/client.js';
 import { CurrentUser } from '../../../common/decorators/user.decorator.js';
 
 // فرض بر این است که این فایل‌ها را در مرحله بعد می‌سازیم
-import { PayrollEmployeeService } from '../services/payroll-employee.service';
-import { FilterPayrollDto } from '../dto/filter-payroll.dto';
+import { PayrollEmployeeService } from '../services/payroll-employee.service.js';
+import { FilterPayrollDto } from '../dto/filter-payroll.dto.js';
 
 @ApiTags('Payroll - Employee')
 @ApiBearerAuth()

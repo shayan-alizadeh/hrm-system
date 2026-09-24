@@ -13,10 +13,10 @@ import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Roles } from '../../auth/decorators/roles.decorator.js';
 import { RoleType } from '../../../../generated/prisma/enums.js';
 import { Payroll } from '../../../../generated/prisma/client.js';
-import { PayrollManagerService } from '../services/payroll-manager.service';
-import { CreatePayrollDto } from '../dto/create-payroll.dto';
-import { UpdatePayrollDto } from '../dto/update-payroll.dto';
-import { FilterPayrollDto } from '../dto/filter-payroll.dto';
+import { PayrollManagerService } from '../services/payroll-manager.service.js';
+import { CreatePayrollDto } from '../dto/create-payroll.dto.js';
+import { UpdatePayrollDto } from '../dto/update-payroll.dto.js';
+import { FilterPayrollDto } from '../dto/filter-payroll.dto.js';
 
 @ApiTags('Payroll - Manager')
 @ApiBearerAuth()
