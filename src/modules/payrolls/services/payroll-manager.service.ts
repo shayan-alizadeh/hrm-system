@@ -8,7 +8,7 @@ import { CreatePayrollDto } from '../dto/create-payroll.dto.js';
 import { UpdatePayrollDto } from '../dto/update-payroll.dto.js';
 import { FilterPayrollDto } from '../dto/filter-payroll.dto.js';
 import { PayrollStatus } from '../../../../generated/prisma/enums.js';
-import {PayrollCalculatorService} from '../services/payroll-calculator.service.js'
+import {PayrollCalculatorService} from './payroll-calculator.service.js'
 
 @Injectable()
 export class PayrollManagerService {

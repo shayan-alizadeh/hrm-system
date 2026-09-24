@@ -53,6 +53,9 @@ model User {
   refreshTokens RefreshToken[]
   attendances   Attendance[]
   payrolls      Payroll[]
+  leaveBalances LeaveBalance[]
+  leaveRequests LeaveRequest[]
+  
 
   @@map("users")
 }
@@ -119,4 +122,61 @@ model TaxRule {
   updatedAt  DateTime @updatedAt
 
   @@map("tax_rules")
+}
+
+// انواع مرخصی در قانون کار ایران
+enum LeaveType {
+  ANNUAL       // استحقاقی (سالانه)
+  SICK         // استعلاجی (بیماری)
+  UNPAID       // بدون حقوق
+  MARRIAGE     // ازدواج
+  BEREAVEMENT  // سوگ (فوت بستگان)
+}
+
+// وضعیت درخواست مرخصی
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELED    // لغو شده توسط خود کارمند قبل از تایید مدیر
+}
+
+model LeaveBalance {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @unique // هر کاربر فقط یک رکورد موجودی در سال دارد
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  year        Int      // سال شمسی، مثلا 1404
+  totalDays   Float    @default(26) // کل مرخصی استحقاقی سال (طبق قانون ۲۶ روز)
+  usedDays    Float    @default(0)  // روزهای استفاده شده
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("leave_balances")
+}
+
+model LeaveRequest {
+  id          Int         @id @default(autoincrement())
+  userId      Int
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  leaveType   LeaveType
+  startDate   String      @db.VarChar(10) // فرمت: 1404/09/01
+  endDate     String      @db.VarChar(10) // فرمت: 1404/09/03
+  
+  // برای محاسبه کسر از موجودی (چون ممکن است جمعه‌ها وسط مرخصی باشد و حساب نشود)
+  totalDays   Float       
+  
+  reason      String      @db.Text
+  status      LeaveStatus @default(PENDING)
+  
+  // فیلدهای مربوط به مدیر (چه کسی و کی تایید/رد کرد؟)
+  managerNote String?     @db.Text
+  resolvedAt  DateTime?   // زمان تایید یا رد
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@map("leave_requests")
 }
