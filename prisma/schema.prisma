@@ -64,7 +64,7 @@ model RefreshToken {
   id        Int    @id @default(autoincrement())
   tokenHash String @db.VarChar(255) // طول مشخص برای هش
   userId    Int
-  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade) // اضافه شدن Cascade برای خروج خودکار در صورت حذف کاربر
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade , map: "fk_refresh_token_user") // اضافه شدن Cascade برای خروج خودکار در صورت حذف کاربر
 
   createdAt DateTime  @default(now())
   revokedAt DateTime?
@@ -143,8 +143,8 @@ enum LeaveStatus {
 
 model LeaveBalance {
   id          Int      @id @default(autoincrement())
-  userId      Int      @unique // هر کاربر فقط یک رکورد موجودی در سال دارد
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      Int      
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade,map: "fk_leave_balance_user")
   
   year        Int      // سال شمسی، مثلا 1404
   totalDays   Float    @default(26) // کل مرخصی استحقاقی سال (طبق قانون ۲۶ روز)
@@ -153,6 +153,7 @@ model LeaveBalance {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  @@unique([userId, year])
   @@map("leave_balances")
 }
 
