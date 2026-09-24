@@ -46,22 +46,44 @@ export class PayrollManagerService {
       );
     }
 
-    // ۲. محاسبه مبلغ کل (Total Amount)
-    const bonuses = dto.bonuses || 0;
-    const deductions = dto.deductions || 0;
-    const totalAmount = dto.baseSalary + bonuses - deductions;
+    // ۲. استخراج سال از دوره پرداخت (مثلاً از "1404/08" عدد 1404 را می‌گیریم)
+    const year = Number(dto.payPeriod.split('/')[0]);
 
-    // ۳. ایجاد رکورد در دیتابیس
+    // ۳. محاسبه حق بیمه سهم کارمند (توسط سرویس محاسبه‌گر)
+    const insurance = this.calculatorService.calculateInsurance(dto.baseSalary);
+
+    // ۴. محاسبه مالیات داینامیک با اتصال به دیتابیس
+    const bonuses = dto.bonuses || 0;
+    const manualDeductions = dto.deductions || 0; // کسورات دستی که مدیر وارد کرده است
+
+    // درآمد مشمول مالیات طبق قانون: (حقوق پایه + پاداش) - حق بیمه کارمند
+    const taxableIncome = dto.baseSalary + bonuses - insurance;
+
+    // کلمه await بسیار مهم است چون این متد به دیتابیس وصل می‌شود
+    const tax = await this.calculatorService.calculateTax(taxableIncome, year);
+
+    // ۵. تجمیع کل کسورات و محاسبه مبلغ خالص (Total Amount)
+    const totalDeductions = manualDeductions + insurance + tax;
+    const totalAmount = dto.baseSalary + bonuses - totalDeductions;
+
+    // ۶. اضافه‌کردن جزئیات مالیات و بیمه به یادداشت‌ها برای شفافیت فیش حقوقی (توصیه حرفه‌ای)
+    const systemNotes = `[بیمه: ${insurance.toLocaleString('fa-IR')} | مالیات: ${tax.toLocaleString('fa-IR')}]`;
+    const finalNotes = dto.notes
+      ? `${dto.notes} | ${systemNotes}`
+      : systemNotes;
+
+    // ۷. ایجاد رکورد در دیتابیس
     const newPayroll = await this.prisma.payroll.create({
       data: {
         userId: dto.userId,
         payPeriod: dto.payPeriod,
         baseSalary: dto.baseSalary,
         bonuses,
-        deductions,
+        deductions: totalDeductions, // کسورات نهایی (دستی + بیمه + مالیات)
         totalAmount,
         status: dto.status || PayrollStatus.PENDING,
-        notes: dto.notes,
+        notes: finalNotes, // ثبت شفاف کسورات قانونی در سیستم
+
         // اگر وضعیت پرداخت شده بود، تاریخ پرداخت امروز ثبت شود
         ...(dto.status === PayrollStatus.PAID && { paymentDate: new Date() }),
       },
