@@ -15,7 +15,7 @@ import {
   ApiOperation,
   ApiQuery,
 } from '@nestjs/swagger';
-import { Roles } from '../../../common/decorators/roles.decorator';
+import { Roles } from '../../auth/decorators/roles.decorator.js';
 import { RoleType } from '../../../../generated/prisma/enums.js';
 
 import { HolidayService } from '../services/holiday.service.js';

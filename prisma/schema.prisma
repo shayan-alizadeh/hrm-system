@@ -148,7 +148,9 @@ model LeaveBalance {
   
   year        Int      // سال شمسی، مثلا 1404
   totalDays   Float    @default(26) // کل مرخصی استحقاقی سال (طبق قانون ۲۶ روز)
-  usedDays    Float    @default(0)  // روزهای استفاده شده
+  usedDays    Float    @default(0)  // مرخصی استحقاقی مصرف شده
+  usedSickDays   Float    @default(0) // مرخصی استعلاجی مصرف شده
+  usedUnpaidDays Float    @default(0) // مرخصی بدون حقوق مصرف شده
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

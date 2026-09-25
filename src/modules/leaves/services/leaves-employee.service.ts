@@ -30,7 +30,7 @@ export class LeavesEmployeeService {
 
   /**
    * محاسبه روزهای خالص مرخصی با کسر جمعه‌ها و تعطیلات رسمی دیتابیس
-   * توجه: متد به async تغییر یافت
+   * 
    */
   private async calculateTotalDays(
     startDate: string,
