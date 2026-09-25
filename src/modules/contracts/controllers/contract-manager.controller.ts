@@ -14,13 +14,13 @@ import {
   ApiOperation,
   ApiQuery,
 } from '@nestjs/swagger';
-import { Roles } from '../../../common/decorators/roles.decorator.js';
+import { Roles } from '../../auth/decorators/roles.decorator.js';
 import {
   ContractStatus,
   RoleType,
 } from '../../../../generated/prisma/client.js';
 
-import { ContractService } from '../services/contracts.service.js';
+import { ContractService } from '../services/contract.service.js';
 import { CreateContractDto } from '../dto/create-contract.dto.js';
 import { UpdateContractDto } from '../dto/update-contract.dto.js';
 
