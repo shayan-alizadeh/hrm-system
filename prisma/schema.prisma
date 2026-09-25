@@ -55,6 +55,7 @@ model User {
   payrolls      Payroll[]
   leaveBalances LeaveBalance[]
   leaveRequests LeaveRequest[]
+  contracts Contract[]
   
 
   @@map("users")
@@ -193,4 +194,49 @@ model Holiday {
   updatedAt   DateTime @updatedAt
 
   @@map("holidays")
+}
+
+
+enum ContractType {
+  FULL_TIME   // تمام وقت
+  PART_TIME   // پاره وقت
+  INTERNSHIP  // کارآموزی
+  PROBATION   // آزمایشی (سه ماهه)
+}
+
+enum ContractStatus {
+  ACTIVE      // فعال
+  EXPIRED     // پایان یافته
+  TERMINATED  // فسخ شده
+}
+
+// مدل اصلی قرارداد
+model Contract {
+  id            Int            @id @default(autoincrement())
+  userId        Int
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  contractNo    String         @unique @db.VarChar(50) // شماره یکتای قرارداد در سازمان
+  jobTitle      String         @db.VarChar(100)        // عنوان شغلی (مثلاً توسعه دهنده بک‌اند)
+  type          ContractType
+  status        ContractStatus @default(ACTIVE)
+
+  startDate     String         @db.VarChar(10) // 1404/01/01
+  endDate       String         @db.VarChar(10) // 1404/12/29
+  
+  // اطلاعات مالی برای استفاده اتوماتیک در ماژول Payroll
+  baseSalary    Float          // حقوق پایه
+  housingAllowance Float       @default(0) // حق مسکن
+  foodAllowance    Float       @default(0) // حق بن کارگری (خواربار)
+  childAllowance   Float       @default(0) // حق اولاد
+  
+  insuranceNo   String?        @db.VarChar(20) // شماره بیمه تامین اجتماعی
+  
+  fileUrl       String?        // مسیر فایل اسکن شده (مربوط به آپلود فایل در آینده)
+  notes         String?        @db.Text
+
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@map("contracts")
 }
