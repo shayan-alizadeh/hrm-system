@@ -6,28 +6,20 @@ import { FilterPayrollDto } from '../dto/filter-payroll.dto.js';
 export class PayrollEmployeeService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private serializePayroll(payroll: any) {
-    if (!payroll) return null;
-    return {
-      ...payroll,
-      baseSalary: Number(payroll.baseSalary),
-      bonuses: Number(payroll.bonuses),
-      deductions: Number(payroll.deductions),
-      totalAmount: Number(payroll.totalAmount),
-    };
-  }
+  // متد serializePayroll کاملاً حذف شد چون Float در جاوااسکریپت به صورت Number استاندارد خوانده می‌شود
 
   async findMyPayrolls(userId: number, filters: FilterPayrollDto) {
-    const payrolls = await this.prisma.payroll.findMany({
+    return await this.prisma.payroll.findMany({
       where: {
         userId,
-        ...(filters.payPeriod && { payPeriod: filters.payPeriod }),
+        // فیلترها بر اساس مدل جدید دیتابیس
+        ...(filters.year && { year: filters.year }),
+        ...(filters.month && { month: filters.month }),
         ...(filters.status && { status: filters.status }),
       },
-      orderBy: { createdAt: 'desc' },
+      // مرتب‌سازی حرفه‌ای‌تر: به جای زمان ایجاد، بر اساس سال و ماه به صورت نزولی مرتب می‌کنیم
+      orderBy: [{ year: 'desc' }, { month: 'desc' }],
     });
-
-    return payrolls.map((p) => this.serializePayroll(p));
   }
 
   async findOne(id: number, userId: number) {
@@ -44,6 +36,6 @@ export class PayrollEmployeeService {
       );
     }
 
-    return this.serializePayroll(payroll);
+    return payroll; // چون دیتا Float است، مستقیماً ریترن می‌شود
   }
 }
