@@ -15,10 +15,6 @@ enum RoleType {
   EMPLOYEE
 }
 
-enum PayrollStatus {
-  PENDING
-  PAID
-}
 
 model Department {
   id          Int     @id @default(autoincrement())
@@ -89,6 +85,12 @@ model Attendance {
   @@map("attendances")
 }
 
+
+enum PayrollStatus {
+  PENDING   // فیش صادر شده و در انتظار بررسی/واریز است
+  PAID      // حقوق به حساب کارمند واریز شده است
+}
+
 model Payroll {
   id                   Int      @id @default(autoincrement())
   userId               Int
@@ -108,7 +110,10 @@ model Payroll {
   unpaidLeaveDeduction Float    // کسر مرخصی بدون حقوق
   
   // مبلغ نهایی قابل پرداخت
-  netSalary            Float    
+  netSalary            Float   
+
+  status               PayrollStatus @default(PENDING)
+  paymentDate          DateTime?     // تاریخ و زمان دقیق واریز بانکی 
   
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt

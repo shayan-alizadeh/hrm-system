@@ -1,43 +1,38 @@
-import {
-  IsOptional,
-  IsInt,
-  IsString,
-  Matches,
-  Min,
-  IsEnum,
-} from 'class-validator';
+import { IsOptional, IsInt, IsEnum, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { PayrollStatus } from '../../../../generated/prisma/enums.js'; 
+import { PayrollStatus } from '../../../../generated/prisma/client.js';
 
 export class FilterPayrollDto {
   @ApiPropertyOptional({
-    description: 'شناسه کاربر (فقط برای مدیران)',
+    description: 'شناسه کاربر (فقط برای مدیران کار می‌کند)',
     example: 1,
   })
-  @Type(() => Number)
-  @IsInt({ message: 'شناسه کاربر باید یک عدد صحیح باشد' })
-  @Min(1, { message: 'شناسه کاربر باید بزرگتر از صفر باشد' })
   @IsOptional()
+  @Type(() => Number)
+  @IsInt()
   userId?: number;
 
-  @ApiPropertyOptional({
-    description: 'دوره حقوق (فرمت: YYYY/MM)',
-    example: '1404/08',
-  })
-  @IsString({ message: 'دوره باید یک رشته متنی باشد' })
-  @Matches(/^\d{4}\/\d{2}$/, {
-    message: 'فرمت دوره صحیح نیست. باید به صورت YYYY/MM باشد',
-  })
+  @ApiPropertyOptional({ description: 'سال', example: 1404 })
   @IsOptional()
-  payPeriod?: string;
+  @Type(() => Number)
+  @IsInt()
+  year?: number;
+
+  @ApiPropertyOptional({ description: 'ماه', example: 8 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(12)
+  month?: number;
 
   @ApiPropertyOptional({
-    description: 'وضعیت پرداخت',
-    example: PayrollStatus.PENDING,
+    description: 'وضعیت فیش حقوقی',
     enum: PayrollStatus,
+    example: PayrollStatus.PENDING,
   })
-  @IsEnum(PayrollStatus, { message: 'وضعیت پرداخت فیلتر نامعتبر است' })
   @IsOptional()
+  @IsEnum(PayrollStatus)
   status?: PayrollStatus;
 }
