@@ -28,7 +28,7 @@ import { UpdateContractDto } from '../dto/update-contract.dto.js';
 @ApiBearerAuth()
 @Roles(RoleType.MANAGER)
 @Controller('manager/contracts')
-export class ContractsManagerController {
+export class ContractManagerController {
   constructor(private readonly contractsService: ContractService) {}
 
   @Post()

@@ -10,7 +10,7 @@ import { ContractService } from '../services/contract.service.js';
 @ApiBearerAuth()
 @Roles(RoleType.EMPLOYEE)
 @Controller('employee/contracts')
-export class ContractsEmployeeController {
+export class ContractEmployeeController {
   constructor(private readonly contractsService: ContractService) {}
 
   @Get('my-active')

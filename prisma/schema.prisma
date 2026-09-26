@@ -90,25 +90,31 @@ model Attendance {
 }
 
 model Payroll {
-  id     Int  @id @default(autoincrement())
-  userId Int
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                   Int      @id @default(autoincrement())
+  userId               Int
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  year                 Int      // مثلا 1404
+  month                Int      // مثلا 8 (آبان)
+  
+  // درآمدهای این ماه
+  baseSalary           Float
+  totalAllowances      Float    // جمع حق مسکن، بن کارگری و حق اولاد
+  grossSalary          Float    // حقوق ناخالص (جمع کل درآمدها)
+  
+  // کسورات
+  taxDeduction         Float    // کسر مالیات
+  insuranceDeduction   Float    // کسر بیمه سهم کارمند (7%)
+  unpaidLeaveDeduction Float    // کسر مرخصی بدون حقوق
+  
+  // مبلغ نهایی قابل پرداخت
+  netSalary            Float    
+  
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
-  payPeriod String @db.VarChar(7) // مثال: 1405-06
-
-  // تغییر به BigInt برای جلوگیری از Overflow مبالغ ریالی
-  baseSalary  BigInt
-  bonuses     BigInt @default(0)
-  deductions  BigInt @default(0) // اصلاح املایی (deduction -> deductions)
-  totalAmount BigInt
-
-  status      PayrollStatus @default(PENDING)
-  paymentDate DateTime?
-  notes       String?       @db.VarChar(250)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  // یک کارمند در هر ماه فقط یک فیش حقوقی می‌تواند داشته باشد
+  @@unique([userId, year, month])
   @@map("payrolls")
 }
 

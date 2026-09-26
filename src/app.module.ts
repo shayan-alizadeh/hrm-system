@@ -8,7 +8,8 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from './modules/auth/guards/roles.guard.js';
 import { AttendanceModule } from './modules/attendances/attendance.module.js';
 import {LeaveModule} from './modules/leaves/leave.module.js';
-import {PayrollModule} from './modules/payrolls/payroll.module.js'
+import {PayrollModule} from './modules/payrolls/payroll.module.js';
+import {ContractModule } from './modules/contracts/contract.module.js'
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import {PayrollModule} from './modules/payrolls/payroll.module.js'
     AttendanceModule,
     PayrollModule,
     LeaveModule,
+    ContractModule,
   ],
   controllers: [],
   providers: [
