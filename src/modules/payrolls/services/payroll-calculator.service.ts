@@ -25,16 +25,15 @@ export class PayrollCalculatorService {
 
     // ۲. الگوریتم محاسبه پلکانی
     for (const rule of rules) {
-      // تبدیل BigInt دیتابیس به Number برای محاسبات ریاضی
-      const minIncome = Number(rule.minIncome);
+      // چون در دیتابیس از نوع Float استفاده کردیم، مقادیر به صورت خودکار Number هستند
+      const minIncome = rule.minIncome;
 
       // آیا درآمد شخص به این پله می‌رسد؟
       if (taxableIncome > minIncome) {
         // اگر این پله سقف داشت، مینیممِ (درآمد شخص یا سقف پله) را می‌گیریم
         // اگر سقف نداشت (null)، یعنی تا بی‌نهایت، پس کل درآمد را مبنا قرار می‌دهیم
-        const maxLimit = rule.maxIncome
-          ? Number(rule.maxIncome)
-          : taxableIncome;
+        const maxLimit =
+          rule.maxIncome !== null ? rule.maxIncome : taxableIncome;
         const upperLimit = Math.min(taxableIncome, maxLimit);
 
         // مبلغی که در این پله خاص مشمول مالیات می‌شود
@@ -47,13 +46,14 @@ export class PayrollCalculatorService {
       }
     }
 
-    return Math.floor(totalTax); // حذف اعشار ریالی
+    return Math.floor(totalTax); // حذف اعشار برای مبالغ ریالی
   }
 
   /**
    * محاسبه حق بیمه سهم کارمند (۷ درصد)
+   * @param insuranceSubjectAmount مجموع حقوق پایه، حق مسکن و بن کارگری
    */
-  calculateInsurance(baseSalary: number): number {
-    return Math.floor(baseSalary * 0.07);
+  calculateInsurance(insuranceSubjectAmount: number): number {
+    return Math.floor(insuranceSubjectAmount * 0.07);
   }
 }

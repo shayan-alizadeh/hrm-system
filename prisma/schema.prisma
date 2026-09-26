@@ -126,8 +126,8 @@ model Payroll {
 model TaxRule {
   id         Int      @id @default(autoincrement())
   year       Int      // مثال: 1404
-  minIncome  BigInt   // کف پله (ریال)
-  maxIncome  BigInt?  // سقف پله - قرار دادن null به معنای بی‌نهایت (بدون سقف) است
+  minIncome  Float    
+  maxIncome  Float?   
   percentage Float    // درصد مالیات این پله (مثلاً 10)
 
   createdAt  DateTime @default(now())
