@@ -9,13 +9,13 @@ import {
   Post,
   UnauthorizedException,
 } from '@nestjs/common';
-import { DepartmentsManagerService } from '../services/departments-manager.service.js';
+import { DepartmentManagerService } from '../services/department-manager.service.js';
 import { CreateDepartmentDto } from '../dto/create-department.dto.js';
 import { UpdateDepartmentDto } from '../dto/update-department.dto.js';
 // import { Department } from '../entities/department.entity';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { RoleType } from '../../../../generated/prisma/enums.js';
-import { Roles } from '../../../modules/auth/decorators/roles.decorator.js';
+import { Roles } from '../../auth/decorators/roles.decorator.js';
 
 /**
  * کنترلر ادمین برای مدیریت دپارتمان‌ها
@@ -25,8 +25,8 @@ import { Roles } from '../../../modules/auth/decorators/roles.decorator.js';
 @ApiBearerAuth()
 @Roles(RoleType.MANAGER)
 @Controller('manager/departments')
-export class DepartmentsManagerController {
-  constructor(private readonly departmentsService: DepartmentsManagerService) {}
+export class DepartmentManagerController {
+  constructor(private readonly departmentsService: DepartmentManagerService) {}
 
   /** POST /admin/departments */
   @Post()
@@ -51,7 +51,7 @@ export class DepartmentsManagerController {
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateDepartmentDto,
-  ){
+  ) {
     return await this.departmentsService.update(id, dto);
   }
 

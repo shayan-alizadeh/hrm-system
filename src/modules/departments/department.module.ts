@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
-import { DepartmentsManagerController } from './controllers/departmants-manager.controller.js';
-import { DepartmentsManagerService } from './services/departments-manager.service.js';
-import { DepartmentsEmployeeController } from './controllers/departmants-employee.controller.js';
-import { DepartmentsEmployeeService } from './services/departments-employee.service.js';
+import { DepartmentsManagerController } from './controllers/department-manager.controller.js';
+import { DepartmentsManagerService } from './services/department-manager.service.js';
+import { DepartmentsEmployeeController } from './controllers/department-employee.controller.js';
+import { DepartmentsEmployeeService } from './services/department-employee.service.js';
 
 @Module({
   imports: [],

@@ -8,7 +8,7 @@ import { UpdateDepartmentDto } from '../dto/update-department.dto.js';
 import { PrismaService } from '../../../prisma/prisma.service.js';
 
 @Injectable()
-export class DepartmentsManagerService {
+export class DepartmentManagerService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(payload: CreateDepartmentDto) {

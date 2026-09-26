@@ -1,7 +1,7 @@
-// src/prisma/prisma.service.ts
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
+
 import { PrismaClient } from '../../generated/prisma/client.js';
 
 @Injectable()
@@ -9,25 +9,47 @@ export class PrismaService
   extends PrismaClient
   implements OnModuleInit, OnModuleDestroy
 {
-  constructor(private configService: ConfigService) {
-    // ایجاد آداپتور MariaDB با استفاده از ConfigService
+  constructor(configService: ConfigService) {
+    const host = configService.getOrThrow<string>('DATABASE_HOST');
+
+    const user = configService.getOrThrow<string>('DATABASE_USER');
+
+    const password = configService.getOrThrow<string>('DATABASE_PASSWORD');
+
+    const database = configService.getOrThrow<string>('DATABASE_NAME');
+
+    const port = configService.get<number>('DATABASE_PORT', 3306);
+
+    const connectionLimit = configService.get<number>(
+      'DATABASE_CONNECTION_LIMIT',
+      5,
+    );
+
     const adapter = new PrismaMariaDb({
-      host: configService.get<string>('DATABASE_HOST'),
-      user: configService.get<string>('DATABASE_USER'),
-      password: configService.get<string>('DATABASE_PASSWORD'),
-      database: configService.get<string>('DATABASE_NAME'),
-      connectionLimit: 5,
+      host,
+      port,
+      user,
+      password,
+      database,
+      connectionLimit,
+
+      /*
+       * Explicit timeouts are preferable to relying
+       * entirely on driver defaults.
+       */
+      connectTimeout: 5_000,
     });
 
-    // ارسال آداپتور به سازنده کلاس پدر (PrismaClient)
-    super({ adapter });
+    super({
+      adapter,
+    });
   }
 
-  async onModuleInit() {
+  async onModuleInit(): Promise<void> {
     await this.$connect();
   }
 
-  async onModuleDestroy() {
+  async onModuleDestroy(): Promise<void> {
     await this.$disconnect();
   }
 }
