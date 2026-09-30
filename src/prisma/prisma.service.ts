@@ -19,12 +19,9 @@ export class PrismaService
 
     const database = configService.getOrThrow<string>('DATABASE_NAME');
 
-    const port = configService.get<number>('DATABASE_PORT', 3306);
-
-    const connectionLimit = configService.get<number>(
-      'DATABASE_CONNECTION_LIMIT',
-      5,
-    );
+    // استفاده از تبدیل به عدد برای جلوگیری از باگ‌های تایپ (در صورت عمل نکردن validation)
+    const port = Number(configService.get<number>('DATABASE_PORT', 3306));
+    const connectionLimit = Number(configService.get<number>('DATABASE_CONNECTION_LIMIT', 5));
 
     const adapter = new PrismaMariaDb({
       host,

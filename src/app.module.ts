@@ -10,12 +10,14 @@ import { AttendanceModule } from './modules/attendances/attendance.module.js';
 import {LeaveModule} from './modules/leaves/leave.module.js';
 import {PayrollModule} from './modules/payrolls/payroll.module.js';
 import {ContractModule } from './modules/contracts/contract.module.js'
+import {validateEnvironment} from './config/env.validation.js'
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+      validate: validateEnvironment,
     }),
     PrismaModule,
     AuthModule,

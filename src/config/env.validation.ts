@@ -1,108 +1,130 @@
-type Environment = 'development' | 'test' | 'production';
+// src/config/env.validation.ts
+import { plainToInstance, Transform } from 'class-transformer';
+import {
+  IsEnum,
+  IsNumber,
+  IsString,
+  IsBoolean,
+  Max,
+  Min,
+  validateSync,
+  IsOptional,
+  IsNotEmpty,
+} from 'class-validator';
 
-function requireString(config: Record<string, unknown>, key: string): string {
-  const value = config[key];
-
-  if (typeof value !== 'string' || value.trim() === '') {
-    throw new Error(`Environment variable "${key}" is required`);
-  }
-
-  return value.trim();
+enum Environment {
+  Development = 'development',
+  Production = 'production',
+  Test = 'test',
 }
 
-function parseInteger(
-  value: unknown,
-  key: string,
-  defaultValue: number,
-  min: number,
-  max: number,
-): number {
-  if (value === undefined || value === '') {
-    return defaultValue;
-  }
+class EnvironmentVariables {
+  @IsEnum(Environment)
+  @IsOptional()
+  NODE_ENV: Environment = Environment.Development;
 
-  const parsed = Number(value);
+  @IsString()
+  @IsOptional()
+  APP_NAME: string = 'HR API';
 
-  if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
-    throw new Error(
-      `Environment variable "${key}" must be an integer between ${min} and ${max}`,
-    );
-  }
+  @IsNumber()
+  @Min(1)
+  @Max(65535)
+  @IsOptional()
+  PORT: number = 3001;
 
-  return parsed;
+  @IsString()
+  @IsNotEmpty()
+  CORS_ORIGINS!: string;
+
+  // --- Database Environment Variables ---
+
+  @IsString()
+  @IsNotEmpty()
+  DATABASE_HOST!: string;
+
+  @IsNumber()
+  @Min(1)
+  @Max(65535)
+  @IsOptional()
+  DATABASE_PORT: number = 3306;
+
+  @IsString()
+  @IsNotEmpty()
+  DATABASE_USER!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  DATABASE_PASSWORD!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  DATABASE_NAME!: string;
+
+  @IsNumber()
+  @Min(1)
+  @Max(100)
+  @IsOptional()
+  DATABASE_CONNECTION_LIMIT: number = 5;
+
+  // --- JWT & Auth Environment Variables ---
+
+  @IsString()
+  @IsNotEmpty()
+  JWT_ACCESS_SECRET!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  JWT_REFRESH_SECRET!: string;
+
+  @IsString()
+  @IsOptional()
+  ACCESS_TOKEN_EXPIRE: string = '15m';
+
+  @IsString()
+  @IsOptional()
+  REFRESH_TOKEN_EXPIRE: string = '14d';
+
+  @IsString()
+  @IsOptional()
+  JWT_ISSUER: string = 'hr-api';
+
+  @IsString()
+  @IsOptional()
+  JWT_AUDIENCE: string = 'hr-api-client';
+
+  // --- Features ---
+
+  @IsBoolean()
+  @IsOptional()
+  @Transform(({ obj, value }) => {
+    // اگر مقدار صراحتاً در env تنظیم شده باشد
+    if (value !== undefined && value !== '') {
+      return value === 'true' || value === true || value === '1';
+    }
+    // در غیر این صورت، سوگر فقط در محیط‌های غیر از پروداکشن فعال باشد
+    return obj.NODE_ENV !== Environment.Production;
+  })
+  SWAGGER_ENABLED!: boolean;
 }
 
-function parseBoolean(value: unknown, defaultValue: boolean): boolean {
-  if (value === undefined) {
-    return defaultValue;
+export function validateEnvironment(config: Record<string, unknown>) {
+  const validatedConfig = plainToInstance(EnvironmentVariables, config, {
+    enableImplicitConversion: true,
+  });
+
+  const errors = validateSync(validatedConfig, {
+    skipMissingProperties: false,
+  });
+
+  if (errors.length > 0) {
+    // استخراج و نمایش تمیز خطاهای ولیدیشن به جای نمایش آبجکت خام
+    const errorMessages = errors
+      .map((error) => Object.values(error.constraints || {}).join(', '))
+      .join('\n');
+
+    throw new Error(`Environment validation failed:\n${errorMessages}`);
   }
 
-  if (value === true || value === 'true' || value === '1') {
-    return true;
-  }
-
-  if (value === false || value === 'false' || value === '0') {
-    return false;
-  }
-
-  throw new Error(`Invalid boolean value: ${String(value)}`);
-}
-
-export function validateEnvironment(
-  config: Record<string, unknown>,
-): Record<string, unknown> {
-  const nodeEnv = (config.NODE_ENV as Environment | undefined) ?? 'development';
-
-  if (!['development', 'test', 'production'].includes(nodeEnv)) {
-    throw new Error('NODE_ENV must be development, test, or production');
-  }
-
-  const port = parseInteger(config.PORT, 'PORT', 3001, 1, 65535);
-
-  const databasePort = parseInteger(
-    config.DATABASE_PORT,
-    'DATABASE_PORT',
-    3306,
-    1,
-    65535,
-  );
-
-  const connectionLimit = parseInteger(
-    config.DATABASE_CONNECTION_LIMIT,
-    'DATABASE_CONNECTION_LIMIT',
-    5,
-    1,
-    100,
-  );
-
-  const swaggerEnabled = parseBoolean(
-    config.SWAGGER_ENABLED,
-    nodeEnv !== 'production',
-  );
-
-  return {
-    ...config,
-
-    NODE_ENV: nodeEnv,
-
-    APP_NAME: typeof config.APP_NAME === 'string' ? config.APP_NAME : 'HR API',
-
-    PORT: port,
-
-    CORS_ORIGINS: requireString(config, 'CORS_ORIGINS'),
-
-    DATABASE_HOST: requireString(config, 'DATABASE_HOST'),
-
-    DATABASE_USER: requireString(config, 'DATABASE_USER'),
-
-    DATABASE_PASSWORD: requireString(config, 'DATABASE_PASSWORD'),
-
-    DATABASE_NAME: requireString(config, 'DATABASE_NAME'),
-
-    DATABASE_PORT: databasePort,
-
-    DATABASE_CONNECTION_LIMIT: connectionLimit,
-
-    SWAGGER_ENABLED: swaggerEnabled,
-  };
+  return validatedConfig;
 }
