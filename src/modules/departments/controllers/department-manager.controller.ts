@@ -4,63 +4,62 @@ import {
   Delete,
   Get,
   Param,
-  ParseIntPipe,
   Patch,
   Post,
-  UnauthorizedException,
 } from '@nestjs/common';
-import { DepartmentManagerService } from '../services/department-manager.service.js';
+import { ApiBearerAuth } from '@nestjs/swagger';
+
+import { RoleType } from '../../../../generated/prisma/enums.js';
+import { ParseIdPipe } from '../../../common/pipes/parse-id.pipe.js';
+import { Roles } from '../../auth/decorators/roles.decorator.js';
 import { CreateDepartmentDto } from '../dto/create-department.dto.js';
 import { UpdateDepartmentDto } from '../dto/update-department.dto.js';
-// import { Department } from '../entities/department.entity';
-import { ApiBearerAuth } from '@nestjs/swagger';
-import { RoleType } from '../../../../generated/prisma/enums.js';
-import { Roles } from '../../auth/decorators/roles.decorator.js';
+import { DepartmentManagerService } from '../services/department-manager.service.js';
 
 /**
- * کنترلر ادمین برای مدیریت دپارتمان‌ها
- * مسیرهای CRUD را ارائه می‌دهد
+ * مسیرهای مدیریت دپارتمان برای مدیران.
+ * اعتبارسنجی body توسط ValidationPipe سراسری انجام می‌شود.
  */
-// api.hrsystem.ir/manager
 @ApiBearerAuth()
 @Roles(RoleType.MANAGER)
 @Controller('manager/departments')
 export class DepartmentManagerController {
-  constructor(private readonly departmentsService: DepartmentManagerService) {}
+  constructor(private readonly departmentService: DepartmentManagerService) {}
 
-  /** POST /admin/departments */
+  /** POST /api/v1/manager/departments */
   @Post()
   async create(@Body() dto: CreateDepartmentDto) {
-    return await this.departmentsService.create(dto);
+    return this.departmentService.create(dto);
   }
 
-  /** GET /admin/departments */
+  /** GET /api/v1/manager/departments */
   @Get()
   async findAll() {
-    return await this.departmentsService.findAll();
+    return this.departmentService.findAll();
   }
 
-  /** GET /admin/departments/:id */
+  /** GET /api/v1/manager/departments/:id */
   @Get(':id')
-  async findOne(@Param('id', ParseIntPipe) id: number) {
-    return await this.departmentsService.findOne(id);
+  async findOne(@Param('id', ParseIdPipe) id: number) {
+    return this.departmentService.findOne(id);
   }
 
-  /** PATCH /admin/departments/:id */
+  /** PATCH /api/v1/manager/departments/:id */
   @Patch(':id')
   async update(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseIdPipe) id: number,
     @Body() dto: UpdateDepartmentDto,
   ) {
-    return await this.departmentsService.update(id, dto);
+    return this.departmentService.update(id, dto);
   }
 
-  /** DELETE /admin/departments/:id */
+  /** DELETE /api/v1/manager/departments/:id */
   @Delete(':id')
   async remove(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseIdPipe) id: number,
   ): Promise<{ success: boolean }> {
-    await this.departmentsService.remove(id);
+    await this.departmentService.remove(id);
+
     return { success: true };
   }
 }

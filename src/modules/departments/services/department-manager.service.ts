@@ -1,31 +1,37 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
-  BadRequestException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
+
+import { Prisma } from '../../../../generated/prisma/client.js';
+import { PrismaService } from '../../../prisma/prisma.service.js';
 import { CreateDepartmentDto } from '../dto/create-department.dto.js';
 import { UpdateDepartmentDto } from '../dto/update-department.dto.js';
-import { PrismaService } from '../../../prisma/prisma.service.js';
+
+const MAX_DELETE_ATTEMPTS = 3;
 
 @Injectable()
 export class DepartmentManagerService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(payload: CreateDepartmentDto) {
-    return await this.prisma.department.create({
+    return this.prisma.department.create({
       data: payload,
     });
   }
 
   async findAll() {
-    return await this.prisma.department.findMany({
+    return this.prisma.department.findMany({
       orderBy: {
         createdAt: 'desc',
       },
-      // اضافه کردن تعداد کارمندان هر دپارتمان برای پنل مدیریت
       include: {
         _count: {
-          select: { users: true },
+          select: {
+            users: true,
+          },
         },
       },
     });
@@ -36,7 +42,9 @@ export class DepartmentManagerService {
       where: { id },
       include: {
         _count: {
-          select: { users: true },
+          select: {
+            users: true,
+          },
         },
       },
     });
@@ -49,32 +57,90 @@ export class DepartmentManagerService {
   }
 
   async update(id: number, payload: UpdateDepartmentDto) {
-    await this.findOne(id); // چک کردن وجود دپارتمان
+    try {
+      // خود update نبود رکورد را تشخیص می‌دهد؛ بررسی جداگانه
+      // جلوی حذف هم‌زمان را نمی‌گیرد و یک کوئری اضافه ایجاد می‌کند.
+      return await this.prisma.department.update({
+        where: { id },
+        data: payload,
+      });
+    } catch (error: unknown) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
+        throw new NotFoundException('دپارتمانی با این شناسه یافت نشد.');
+      }
 
-    return await this.prisma.department.update({
-      where: { id },
-      data: payload,
-    });
+      throw error;
+    }
   }
 
-  async remove(id: number) {
-    // ۱. بررسی وجود دپارتمان
-    await this.findOne(id);
+  /**
+   * فقط دپارتمان بدون عضو حذف می‌شود.
+   *
+   * وجود دپارتمان، شمارش اعضا و حذف در یک تراکنش Serializable
+   * انجام می‌شوند تا تغییر هم‌زمان عضویت، بررسی اولیه را بی‌اعتبار نکند.
+   */
+  async remove(id: number): Promise<void> {
+    for (let attempt = 0; attempt < MAX_DELETE_ATTEMPTS; attempt += 1) {
+      try {
+        await this.prisma.$transaction(
+          async (tx) => {
+            const department = await tx.department.findUnique({
+              where: { id },
+              select: { id: true },
+            });
 
-    // ۲. بررسی منطق تجاری: آیا کارمندی در این دپارتمان هست؟
-    const usersCount = await this.prisma.user.count({
-      where: { departmentId: id },
-    });
+            if (!department) {
+              throw new NotFoundException('دپارتمانی با این شناسه یافت نشد.');
+            }
 
-    if (usersCount > 0) {
-      throw new BadRequestException(
-        `نمی‌توانید این دپارتمان را حذف کنید زیرا ${usersCount} کارمند در آن عضو هستند. ابتدا کارمندان را منتقل کنید.`,
-      );
+            // مطابق رفتار قبلی، همه کاربران عضو شمارش می‌شوند؛
+            // نقش و فعال‌بودن کاربر تأثیری بر ممنوعیت حذف ندارد.
+            const usersCount = await tx.user.count({
+              where: {
+                departmentId: id,
+              },
+            });
+
+            if (usersCount > 0) {
+              throw new BadRequestException(
+                `این دپارتمان ${usersCount} عضو دارد و قابل حذف نیست. ابتدا اعضا را منتقل کنید.`,
+              );
+            }
+
+            await tx.department.delete({
+              where: { id },
+            });
+          },
+          {
+            isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+          },
+        );
+
+        return;
+      } catch (error: unknown) {
+        if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
+          throw error;
+        }
+
+        if (error.code === 'P2025') {
+          throw new NotFoundException('دپارتمانی با این شناسه یافت نشد.');
+        }
+
+        // فقط تعارض تراکنش یا deadlock قابل تکرار است.
+        // خطاهای اعتبارسنجی و سایر خطاهای دیتابیس تکرار نمی‌شوند.
+        if (error.code !== 'P2034') {
+          throw error;
+        }
+
+        if (attempt === MAX_DELETE_ATTEMPTS - 1) {
+          throw new ServiceUnavailableException(
+            'حذف دپارتمان به‌دلیل عملیات هم‌زمان انجام نشد؛ دوباره تلاش کنید.',
+          );
+        }
+      }
     }
-
-    // ۳. حذف دپارتمان
-    await this.prisma.department.delete({
-      where: { id },
-    });
   }
 }

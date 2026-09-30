@@ -1,12 +1,14 @@
-import { Controller, Get, Param, ParseIntPipe } from '@nestjs/common';
-import { DepartmentEmployeeService } from '../services/department-employee.service.js';
-// import { Department } from '../entities/department.entity';
+import { Controller, Get, Param } from '@nestjs/common';
 import { ApiBearerAuth } from '@nestjs/swagger';
+
 import { RoleType } from '../../../../generated/prisma/enums.js';
+import { ParseIdPipe } from '../../../common/pipes/parse-id.pipe.js';
 import { Roles } from '../../auth/decorators/roles.decorator.js';
+import { DepartmentEmployeeService } from '../services/department-employee.service.js';
 
 /**
- * کنترلر مخصوص کارمندان برای مشاهده دپارتمان‌ها
+ * مسیرهای مشاهده دپارتمان برای کارمندان.
+ * احراز هویت و کنترل نقش توسط گاردهای سراسری انجام می‌شود.
  */
 @ApiBearerAuth()
 @Roles(RoleType.EMPLOYEE)
@@ -14,15 +16,15 @@ import { Roles } from '../../auth/decorators/roles.decorator.js';
 export class DepartmentEmployeeController {
   constructor(private readonly departmentsService: DepartmentEmployeeService) {}
 
-  /** GET /employee/departments */
+  /** GET /api/v1/employee/departments */
   @Get()
   async findAll() {
-    return await this.departmentsService.findAll();
+    return this.departmentsService.findAll();
   }
 
-  /** GET /employee/departments/:id */
+  /** GET /api/v1/employee/departments/:id */
   @Get(':id')
-  async findOne(@Param('id', ParseIntPipe) id: number) {
-    return await this.departmentsService.findOne(id);
+  async findOne(@Param('id', ParseIdPipe) id: number) {
+    return this.departmentsService.findOne(id);
   }
 }
