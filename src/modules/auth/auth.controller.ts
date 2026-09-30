@@ -1,31 +1,24 @@
-// src/modules/auth/auth.controller.ts
-import {
-  Body,
-  Controller,
-  Post,
-  UnauthorizedException,
-  HttpCode,
-  HttpStatus,
-} from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { User } from '../../../generated/prisma/client.js';
+import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
+import type { User } from '../../../generated/prisma/client.js';
+import { CurrentUser } from '../../common/decorators/user.decorator.js';
 import { AuthService } from './auth.service.js';
-import { RegisterDto } from './dto/register.dto.js';
+import { Public } from './decorators/public.decorator.js';
 import { LoginDto } from './dto/login.dto.js';
 import { RefreshTokenDto } from './dto/refresh-token.dto.js';
-import { Public } from './decorators/public.decorator.js';
-import { CurrentUser } from '../../common/decorators/user.decorator.js';
+import { RegisterDto } from './dto/register.dto.js';
 
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(private readonly authService: AuthService) {}
 
   @Public()
   @Post('register')
-  @ApiOperation({ summary: 'ثبت‌نام کارمند/مدیر جدید' })
+  @ApiOperation({ summary: 'ثبت‌نام کارمند جدید' })
   async register(@Body() dto: RegisterDto) {
+    // محدودیت نقش در خود سرویس نیز اعمال می‌شود تا قابل دورزدن نباشد.
     const user = await this.authService.register(
       dto.mobile,
       dto.password,
@@ -33,7 +26,11 @@ export class AuthController {
       dto.lastName,
       dto.role,
     );
-    return { message: 'ثبت‌نام با موفقیت انجام شد', user };
+
+    return {
+      message: 'ثبت‌نام با موفقیت انجام شد',
+      user,
+    };
   }
 
   @Public()
@@ -42,29 +39,27 @@ export class AuthController {
   @ApiOperation({ summary: 'ورود به سیستم و دریافت توکن' })
   async login(@Body() dto: LoginDto) {
     const user = await this.authService.validateUser(dto.mobile, dto.password);
-    const result = await this.authService.login(user);
-    return result;
+
+    return this.authService.login(user);
   }
 
   @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'دریافت اکسس توکن جدید با رفرش توکن' })
+  @ApiOperation({ summary: 'تعویض رفرش توکن و دریافت اکسس توکن جدید' })
   async refresh(@Body() dto: RefreshTokenDto) {
-    if (!dto.refreshToken) {
-      throw new UnauthorizedException('Refresh token ارسال نشده است.');
-    }
-    const tokens = await this.authService.refreshToken(dto.refreshToken);
-    return tokens;
+    return this.authService.refreshToken(dto.refreshToken);
   }
 
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'خروج از سیستم (باطل کردن توکن‌ها)' })
+  @ApiOperation({ summary: 'خروج از همه نشست‌های کاربر' })
   async logout(@CurrentUser() user: Pick<User, 'id'>) {
-    // تایپ امن جایگزین any شد
     await this.authService.logout(user.id);
-    return { message: 'با موفقیت از سیستم خارج شدید.' };
+
+    return {
+      message: 'با موفقیت از سیستم خارج شدید.',
+    };
   }
 }

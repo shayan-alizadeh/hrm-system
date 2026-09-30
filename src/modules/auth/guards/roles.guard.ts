@@ -1,39 +1,58 @@
 import {
-  Injectable,
   CanActivate,
   ExecutionContext,
   ForbiddenException,
+  Injectable,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { ROLES_KEY } from '../decorators/roles.decorator.js'; // پسوند .js معمولاً در تایپ‌اسکریپت نیاز نیست
-import { RoleType } from '../../../../generated/prisma/enums.js'; // ایمپورت صحیح بر اساس آپدیت دیتابیس
 
+import type { RoleType } from '../../../../generated/prisma/enums.js';
+import { ROLES_KEY } from '../decorators/roles.decorator.js';
+
+interface RequestWithAuthenticatedUser {
+  user?: {
+    id: number;
+    role: RoleType;
+  };
+}
+
+/**
+ * مجوز نقش را پس از اجرای JwtAuthGuard بررسی می‌کند.
+ *
+ * نبود metadata نقش، محدودیت اضافه‌ای اعمال نمی‌کند؛ احراز هویت
+ * مسیرهای غیرعمومی همچنان بر عهده JwtAuthGuard است.
+ */
 @Injectable()
 export class RolesGuard implements CanActivate {
-  constructor(private reflector: Reflector) {}
+  constructor(private readonly reflector: Reflector) {}
 
-  canActivate(context: ExecutionContext) {
-    
-    const requiredRoles = this.reflector.getAllAndOverride<RoleType[]>(
+  canActivate(context: ExecutionContext): boolean {
+    // تنظیمات متد بر تنظیمات سطح کنترلر اولویت دارند.
+    const requiredRoles = this.reflector.getAllAndOverride<readonly RoleType[]>(
       ROLES_KEY,
       [context.getHandler(), context.getClass()],
     );
 
-    if (!requiredRoles || requiredRoles.length === 0) return true;
+    if (!requiredRoles || requiredRoles.length === 0) {
+      return true;
+    }
 
-    const { user } = context.switchToHttp().getRequest();
+    const request = context
+      .switchToHttp()
+      .getRequest<RequestWithAuthenticatedUser>();
 
-    // این چک امنیتی بسیار خوب است، هرچند اگر JwtAuthGuard قبل از این گارد اجرا شود،
-    // user همیشه برای روت‌های غیر پابلیک وجود خواهد داشت.
-    if (!user)
-      throw new ForbiddenException('برای دسترسی به این روت باید وارد شوید');
+    const user = request.user;
 
-    const hasRole = requiredRoles.includes(user.role);
-
-    if (!hasRole)
-      throw new ForbiddenException(
-        `شما دسترسی به این روت را ندارید. نقش‌های مجاز: ${requiredRoles.join(', ')}`,
+    if (!user) {
+      throw new UnauthorizedException(
+        'برای دسترسی به این مسیر باید وارد شوید.',
       );
+    }
+
+    if (!requiredRoles.includes(user.role)) {
+      throw new ForbiddenException('شما مجوز دسترسی به این مسیر را ندارید.');
+    }
 
     return true;
   }
