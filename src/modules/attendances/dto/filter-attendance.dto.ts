@@ -1,36 +1,66 @@
-import { IsOptional, IsString, Matches, IsInt } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
+import { IsInt, IsString, Max, Min, ValidateIf } from 'class-validator';
 
+import { IsJalaliDate } from '../../../common/validators/is-jalali-date.validator.js';
+
+/**
+ * فیلتر گزارش حضور و غیاب.
+ *
+ * در مسیر کارمند، مالک گزارش از توکن تعیین می‌شود.
+ * userId فقط در سرویس گزارش مدیر به‌عنوان فیلتر استفاده می‌شود.
+ */
 export class FilterAttendanceDto {
   @ApiPropertyOptional({
-    description: 'شناسه کاربر (مخصوص پنل مدیریت برای فیلتر کردن کارمندان)',
+    description: 'شناسه کاربر برای فیلتر گزارش در پنل مدیریت',
     example: 5,
+    type: Number,
+    minimum: 1,
+    maximum: 2_147_483_647,
+    nullable: false,
   })
-  @IsOptional()
-  @Type(() => Number) // تبدیل استرینگِ کوئری‌ارل به عدد
-  @IsInt({ message: 'شناسه کاربر باید عدد باشد' })
+  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @Type(() => Number)
+  @IsInt({
+    message: 'شناسه کاربر باید یک عدد صحیح باشد.',
+  })
+  @Min(1, {
+    message: 'شناسه کاربر باید بزرگ‌تر از صفر باشد.',
+  })
+  @Max(2_147_483_647, {
+    message: 'شناسه کاربر خارج از محدوده مجاز است.',
+  })
   userId?: number;
 
   @ApiPropertyOptional({
-    description: 'تاریخ شمسی شروع بازه',
+    description: 'تاریخ شمسی شروع بازه، شامل خود این روز',
     example: '1404/09/01',
+    minLength: 10,
+    maxLength: 10,
+    nullable: false,
   })
-  @IsString({ message: 'فرمت تاریخ شروع صحیح نیست' })
-  @Matches(/^(13|14)\d{2}\/(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])$/, {
-    message: 'فرمت تاریخ شروع نامعتبر است. فرمت صحیح: yyyy/mm/dd',
+  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @IsString({
+    message: 'تاریخ شروع باید یک رشته متنی باشد.',
   })
-  @IsOptional()
-  startDate?: string; // تغییر از startTime به startDate
+  @IsJalaliDate({
+    message: 'تاریخ شروع باید یک تاریخ شمسی معتبر با قالب YYYY/MM/DD باشد.',
+  })
+  startDate?: string;
 
   @ApiPropertyOptional({
-    description: 'تاریخ شمسی پایان بازه',
-    example: '1404/09/31',
+    description: 'تاریخ شمسی پایان بازه، شامل خود این روز',
+    example: '1404/09/30',
+    minLength: 10,
+    maxLength: 10,
+    nullable: false,
   })
-  @IsString({ message: 'فرمت تاریخ پایان صحیح نیست' })
-  @Matches(/^(13|14)\d{2}\/(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])$/, {
-    message: 'فرمت تاریخ پایان نامعتبر است. فرمت صحیح: yyyy/mm/dd',
+  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @IsString({
+    message: 'تاریخ پایان باید یک رشته متنی باشد.',
   })
-  @IsOptional()
-  endDate?: string; // تغییر از endTime به endDate
+  @IsJalaliDate({
+    message: 'تاریخ پایان باید یک تاریخ شمسی معتبر با قالب YYYY/MM/DD باشد.',
+  })
+  endDate?: string;
 }

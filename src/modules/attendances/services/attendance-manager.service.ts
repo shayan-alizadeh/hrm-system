@@ -1,5 +1,18 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+
+import { Prisma } from '../../../../generated/prisma/client.js';
 import { PrismaService } from '../../../prisma/prisma.service.js';
+import {
+  appendAttendanceNotes,
+  assertAttendanceTimes,
+  buildAttendanceDateFilter,
+  parseAttendanceTime,
+  runAttendanceTransaction,
+} from '../utils/attendance.utils.js';
 import { FilterAttendanceDto } from '../dto/filter-attendance.dto.js';
 import { UpdateAttendanceDto } from '../dto/update-attendance.dto.js';
 
@@ -7,24 +20,28 @@ import { UpdateAttendanceDto } from '../dto/update-attendance.dto.js';
 export class AttendanceManagerService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * دریافت لیست حضور و غیاب تمام کارمندان با قابلیت فیلتر
-   */
   async findAll(filters: FilterAttendanceDto) {
-    return await this.prisma.attendance.findMany({
-      where: {
-        // فیلتر بر اساس یک کارمند خاص (اگر مدیر userId را فرستاده باشد)
-        ...(filters.userId && { userId: filters.userId }),
+    const dateFilter = buildAttendanceDateFilter(
+      filters.startDate,
+      filters.endDate,
+    );
 
-        // فیلتر بازه زمانی
-        ...(filters.startDate && {
-          attendanceDate: { gte: filters.startDate },
-        }),
-        ...(filters.endDate && {
-          attendanceDate: { lte: filters.endDate },
-        }),
+    if (
+      filters.userId !== undefined &&
+      (!Number.isInteger(filters.userId) ||
+        filters.userId < 1 ||
+        filters.userId > 2_147_483_647)
+    ) {
+      throw new BadRequestException(
+        'شناسه کاربر باید عدد صحیح مثبت در محدوده مجاز باشد.',
+      );
+    }
+
+    return this.prisma.attendance.findMany({
+      where: {
+        ...(filters.userId !== undefined ? { userId: filters.userId } : {}),
+        attendanceDate: dateFilter,
       },
-      // برای مدیر مهم است که بداند این رکورد متعلق به کدام کارمند است
       include: {
         user: {
           select: {
@@ -35,15 +52,10 @@ export class AttendanceManagerService {
           },
         },
       },
-      orderBy: {
-        checkInTime: 'desc',
-      },
+      orderBy: [{ checkInTime: 'desc' }, { id: 'desc' }],
     });
   }
 
-  /**
-   * دریافت جزئیات یک رکورد خاص
-   */
   async findOne(id: number) {
     const attendance = await this.prisma.attendance.findUnique({
       where: { id },
@@ -65,43 +77,62 @@ export class AttendanceManagerService {
     return attendance;
   }
 
-  /**
-   * اصلاح دستی رکورد حضور و غیاب توسط مدیر
-   */
   async update(id: number, dto: UpdateAttendanceDto) {
-    // ابتدا بررسی می‌کنیم رکورد وجود داشته باشد
-    const existingRecord = await this.findOne(id);
+    return runAttendanceTransaction(this.prisma, async (tx) => {
+      const existingRecord = await tx.attendance.findUnique({
+        where: { id },
+      });
 
-    // مدیر ممکن است فقط بخواهد یادداشت بگذارد، یا فقط ساعت خروج را اصلاح کند
-    // بنابراین هر فیلدی که فرستاده شده را آپدیت می‌کنیم
-    let updatedNotes = existingRecord.notes;
+      if (!existingRecord) {
+        throw new NotFoundException('رکورد حضور و غیاب با این شناسه یافت نشد.');
+      }
 
-    // اگر مدیر یادداشتی فرستاده بود، آن را به یادداشت‌های قبلی اضافه می‌کنیم (یا جایگزین می‌کنیم)
-    if (dto.notes) {
-      updatedNotes = existingRecord.notes
-        ? `${existingRecord.notes} | یادداشت مدیر: ${dto.notes}`
-        : `یادداشت مدیر: ${dto.notes}`;
-    }
+      // برای بررسی ترتیب، مقدار جدید با مقدار فعلی فیلد دیگر ترکیب می‌شود.
+      // null یا رشته خالی، دستور پاک‌کردن ساعت محسوب نمی‌شود و رد خواهد شد.
+      const checkInTime =
+        dto.checkIn !== undefined
+          ? parseAttendanceTime(dto.checkIn, 'ساعت ورود')
+          : existingRecord.checkInTime;
 
-    return await this.prisma.attendance.update({
-      where: { id },
-      data: {
-        // اگر تاریخ به صورت ISO String فرستاده شده بود، آن را به آبجکت Date تبدیل می‌کنیم
-        ...(dto.checkIn && { checkInTime: new Date(dto.checkIn) }),
-        ...(dto.checkOut && { checkOutTime: new Date(dto.checkOut) }),
-        notes: updatedNotes,
-      },
+      const checkOutTime =
+        dto.checkOut !== undefined
+          ? parseAttendanceTime(dto.checkOut, 'ساعت خروج')
+          : existingRecord.checkOutTime;
+
+      assertAttendanceTimes(checkInTime, checkOutTime);
+
+      const updatedNotes = appendAttendanceNotes(
+        existingRecord.notes,
+        dto.notes,
+        true,
+      );
+
+      return tx.attendance.update({
+        where: { id },
+        data: {
+          ...(dto.checkIn !== undefined ? { checkInTime } : {}),
+          ...(dto.checkOut !== undefined ? { checkOutTime } : {}),
+          notes: updatedNotes,
+        },
+      });
     });
   }
 
-  /**
-   * حذف یک رکورد (مثلاً اگر کارمند به اشتباه در روز تعطیل دکمه را زده است)
-   */
-  async remove(id: number) {
-    await this.findOne(id); // بررسی وجود رکورد
+  async remove(id: number): Promise<void> {
+    try {
+      // حذف مستقیم، فاصله بین بررسی وجود و اجرای delete را حذف می‌کند.
+      await this.prisma.attendance.delete({
+        where: { id },
+      });
+    } catch (error: unknown) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
+        throw new NotFoundException('رکورد حضور و غیاب با این شناسه یافت نشد.');
+      }
 
-    await this.prisma.attendance.delete({
-      where: { id },
-    });
+      throw error;
+    }
   }
 }

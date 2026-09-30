@@ -4,21 +4,23 @@ import {
   Delete,
   Get,
   Param,
-  ParseIntPipe,
   Patch,
   Query,
-  UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
-import { Roles } from '../../auth/decorators/roles.decorator.js';
-import { RoleType } from '../../../../generated/prisma/enums.js';
-import { Attendance } from '../../../../generated/prisma/client.js';
-import { AttendanceManagerService } from '../services/attendance-manager.service.js';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
-// ایمپورت DTOهایی که برای این بخش نیاز داری
+import type { Attendance } from '../../../../generated/prisma/client.js';
+import { RoleType } from '../../../../generated/prisma/enums.js';
+import { ParseIdPipe } from '../../../common/pipes/parse-id.pipe.js';
+import { Roles } from '../../auth/decorators/roles.decorator.js';
 import { FilterAttendanceDto } from '../dto/filter-attendance.dto.js';
 import { UpdateAttendanceDto } from '../dto/update-attendance.dto.js';
+import { AttendanceManagerService } from '../services/attendance-manager.service.js';
 
+/**
+ * مدیریت حضور و غیاب توسط مدیر.
+ * احراز هویت و بررسی نقش توسط گاردهای سراسری انجام می‌شود.
+ */
 @ApiTags('Attendance - Manager')
 @ApiBearerAuth()
 @Roles(RoleType.MANAGER)
@@ -30,36 +32,44 @@ export class AttendanceManagerController {
 
   @Get()
   @ApiOperation({
-    summary: 'مشاهده گزارش حضور و غیاب تمام کارمندان (با فیلتر)',
+    summary: 'مشاهده گزارش حضور و غیاب کارکنان با فیلتر',
   })
-  async findAll(@Query() filters: FilterAttendanceDto): Promise<Attendance[]> {
-    // مدیر می‌تواند لیست حضور و غیاب همه را ببیند و مثلاً روی یک userId خاص فیلتر کند
-    return await this.attendanceManagerService.findAll(filters);
+  async findAll(@Query() filters: FilterAttendanceDto) {
+    // تایپ استنباط‌شده، اطلاعات user موجود در خروجی سرویس را نیز حفظ می‌کند.
+    return this.attendanceManagerService.findAll(filters);
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'مشاهده جزئیات یک رکورد حضور و غیاب خاص' })
-  async findOne(@Param('id', ParseIntPipe) id: number): Promise<Attendance> {
-    return await this.attendanceManagerService.findOne(id);
+  @ApiOperation({
+    summary: 'مشاهده جزئیات رکورد حضور و غیاب',
+  })
+  async findOne(@Param('id', ParseIdPipe) id: number) {
+    return this.attendanceManagerService.findOne(id);
   }
 
   @Patch(':id')
   @ApiOperation({
-    summary: 'اصلاح دستی رکورد حضور و غیاب (مثلا ثبت ساعت خروج فراموش شده)',
+    summary: 'اصلاح دستی ساعت‌ها یا افزودن یادداشت مدیر',
   })
   async update(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseIdPipe) id: number,
     @Body() dto: UpdateAttendanceDto,
   ): Promise<Attendance> {
-    return await this.attendanceManagerService.update(id, dto);
+    return this.attendanceManagerService.update(id, dto);
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'حذف یک رکورد حضور و غیاب نامعتبر' })
+  @ApiOperation({
+    summary: 'حذف رکورد حضور و غیاب',
+  })
   async remove(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseIdPipe) id: number,
   ): Promise<{ success: boolean; message: string }> {
     await this.attendanceManagerService.remove(id);
-    return { success: true, message: 'رکورد حضور و غیاب با موفقیت حذف شد' };
+
+    return {
+      success: true,
+      message: 'رکورد حضور و غیاب با موفقیت حذف شد',
+    };
   }
 }

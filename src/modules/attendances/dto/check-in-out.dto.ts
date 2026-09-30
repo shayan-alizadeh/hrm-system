@@ -1,23 +1,42 @@
-import { IsOptional, IsString, Matches } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsString, MaxLength, ValidateIf } from 'class-validator';
 
+import { IsJalaliDate } from '../../../common/validators/is-jalali-date.validator.js';
+
+/**
+ * ورودی ثبت ورود یا خروج.
+ * نبود تاریخ باعث استفاده از تاریخ روز تهران در سرویس می‌شود.
+ */
 export class CheckInOutDto {
   @ApiPropertyOptional({
     description: 'یادداشت اختیاری برای ورود یا خروج',
-    example: 'ورود با تاخیر به دلیل ترافیک سنگین',
+    example: 'ورود با تأخیر به دلیل ترافیک',
+    maxLength: 250,
+    nullable: false,
   })
-  @IsString({ message: 'یادداشت باید یک رشته متنی باشد' })
-  @IsOptional()
+  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @IsString({
+    message: 'یادداشت باید یک رشته متنی باشد.',
+  })
+  @MaxLength(250, {
+    message: 'یادداشت نمی‌تواند بیشتر از ۲۵۰ کاراکتر باشد.',
+  })
   notes?: string;
 
   @ApiPropertyOptional({
-    description: 'تاریخ شمسی روز کاری',
+    description:
+      'تاریخ شمسی روز کاری با ارقام انگلیسی؛ در صورت حذف، تاریخ روز تهران استفاده می‌شود',
     example: '1404/09/26',
+    minLength: 10,
+    maxLength: 10,
+    nullable: false,
   })
-  @IsString({ message: 'تاریخ باید یک رشته متنی باشد' })
-  @Matches(/^(13|14)\d{2}\/(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])$/, {
-    message: 'فرمت تاریخ نامعتبر است. فرمت صحیح: yyyy/mm/dd (مثال: 1404/09/26)',
+  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @IsString({
+    message: 'تاریخ باید یک رشته متنی باشد.',
   })
-  @IsOptional()
-  attendanceDate?: string; // تغییر j_date به attendanceDate و استفاده از ?
+  @IsJalaliDate({
+    message: 'تاریخ روز کاری باید یک تاریخ شمسی معتبر با قالب YYYY/MM/DD باشد.',
+  })
+  attendanceDate?: string;
 }

@@ -3,114 +3,120 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+
 import { PrismaService } from '../../../prisma/prisma.service.js';
+import {
+  appendAttendanceNotes,
+  assertAttendanceDate,
+  assertAttendanceTimes,
+  buildAttendanceDateFilter,
+  getTehranJalaliDate,
+  runAttendanceTransaction,
+  validateAttendanceNotes,
+} from '../utils/attendance.utils.js';
 import { FilterAttendanceDto } from '../dto/filter-attendance.dto.js';
 
 @Injectable()
 export class AttendanceEmployeeService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * متد کمکی برای دریافت تاریخ امروزِ سرور به شمسی (فرمت yyyy/mm/dd)
-   */
-  private getServerJalaliDate(): string {
-    const formatter = new Intl.DateTimeFormat('fa-IR', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      calendar: 'persian',
-      numberingSystem: 'latn', // استفاده از اعداد انگلیسی برای هم‌خوانی با Regex شما
-      timeZone: 'Asia/Tehran', // تنظیم منطقه زمانی روی ایران
-    });
-
-    // خروجی به شکل "1404/09/26" خواهد بود
-    return formatter.format(new Date());
-  }
-
-  // اضافه شدن علامت ? به attendanceDate برای پذیرش undefined
   async checkIn(userId: number, attendanceDate?: string, notes?: string) {
-    // جادوی اصلی: اگر کلاینت تاریخ را نفرستاد، سرور خودش تاریخ امروز را محاسبه می‌کند
-    const finalDate = attendanceDate || this.getServerJalaliDate();
+    const validatedNotes = validateAttendanceNotes(notes);
 
-    // جلوگیری از Dangling Check-ins (تردد باز)
-    const openedAttendance = await this.prisma.attendance.findFirst({
-      where: {
-        userId,
-        checkOutTime: null,
-      },
-    });
+    return runAttendanceTransaction(this.prisma, async (tx) => {
+      // نبود تردد باز و ایجاد تردد جدید باید در یک تراکنش بررسی شوند.
+      const openedAttendance = await tx.attendance.findFirst({
+        where: {
+          userId,
+          checkOutTime: null,
+        },
+        select: {
+          id: true,
+          attendanceDate: true,
+        },
+      });
 
-    if (openedAttendance) {
-      throw new BadRequestException(
-        `شما یک تردد باز در تاریخ ${openedAttendance.attendanceDate} دارید که خروج آن ثبت نشده است. لطفاً برای اصلاح به مدیر مراجعه کنید.`,
-      );
-    }
+      if (openedAttendance) {
+        throw new BadRequestException(
+          `شما یک تردد باز در تاریخ ${openedAttendance.attendanceDate} دارید که خروج آن ثبت نشده است.`,
+        );
+      }
 
-    return await this.prisma.attendance.create({
-      data: {
-        userId,
-        checkInTime: new Date(),
-        notes: notes ?? null,
-        attendanceDate: finalDate, // استفاده از تاریخ محاسبه شده نهایی
-      },
+      const now = new Date();
+      const finalDate = attendanceDate ?? getTehranJalaliDate(now);
+
+      assertAttendanceDate(finalDate);
+
+      return tx.attendance.create({
+        data: {
+          userId,
+          attendanceDate: finalDate,
+          checkInTime: now,
+          notes: validatedNotes,
+        },
+      });
     });
   }
 
-  // اضافه شدن علامت ? به attendanceDate
   async checkOut(userId: number, attendanceDate?: string, notes?: string) {
-    const finalDate = attendanceDate || this.getServerJalaliDate();
+    return runAttendanceTransaction(this.prisma, async (tx) => {
+      // رفتار قبلی حفظ شده است: بدون تاریخ، تردد روز جاری جست‌وجو می‌شود.
+      const finalDate = attendanceDate ?? getTehranJalaliDate(new Date());
 
-    const attendance = await this.prisma.attendance.findFirst({
-      where: {
-        userId,
-        checkOutTime: null,
-        attendanceDate: finalDate, // استفاده از تاریخ نهایی برای پیدا کردن رکورد امروز
-      },
-      orderBy: {
-        checkInTime: 'desc',
-      },
-    });
+      assertAttendanceDate(finalDate);
 
-    if (!attendance) {
-      throw new NotFoundException(
-        'هیچ رکورد ورودیِ بدون خروجی برای این تاریخ یافت نشد!',
-      );
-    }
+      const attendance = await tx.attendance.findFirst({
+        where: {
+          userId,
+          attendanceDate: finalDate,
+          checkOutTime: null,
+        },
+        orderBy: [{ checkInTime: 'desc' }, { id: 'desc' }],
+      });
 
-    let updatedNotes = attendance.notes;
-    if (notes) {
-      updatedNotes = attendance.notes
-        ? `${attendance.notes} - ${notes}`
-        : notes;
-    }
+      if (!attendance) {
+        throw new NotFoundException(
+          'هیچ رکورد ورودیِ بدون خروج برای این تاریخ یافت نشد.',
+        );
+      }
 
-    return await this.prisma.attendance.update({
-      where: { id: attendance.id },
-      data: {
-        checkOutTime: new Date(),
-        notes: updatedNotes,
-      },
+      if (attendance.checkInTime === null) {
+        throw new BadRequestException(
+          'این رکورد ساعت ورود ندارد؛ اصلاح آن باید توسط مدیر انجام شود.',
+        );
+      }
+
+      const checkOutTime = new Date();
+
+      assertAttendanceTimes(attendance.checkInTime, checkOutTime);
+
+      const updatedNotes = appendAttendanceNotes(attendance.notes, notes);
+
+      return tx.attendance.update({
+        where: {
+          id: attendance.id,
+        },
+        data: {
+          checkOutTime,
+          notes: updatedNotes,
+        },
+      });
     });
   }
 
   async findMyAttendance(userId: number, filters: FilterAttendanceDto) {
-    return await this.prisma.attendance.findMany({
+    const dateFilter = buildAttendanceDateFilter(
+      filters.startDate,
+      filters.endDate,
+    );
+
+    return this.prisma.attendance.findMany({
       where: {
+        // شناسه مالک از توکن می‌آید؛ userId احتمالی query استفاده نمی‌شود.
         userId,
-        ...(filters.startDate && {
-          attendanceDate: {
-            gte: filters.startDate,
-          },
-        }),
-        ...(filters.endDate && {
-          attendanceDate: {
-            lte: filters.endDate,
-          },
-        }),
+        attendanceDate: dateFilter,
       },
-      orderBy: {
-        checkInTime: 'desc',
-      },
+      orderBy: [{ checkInTime: 'desc' }, { id: 'desc' }],
     });
   }
 }
