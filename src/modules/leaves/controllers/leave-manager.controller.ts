@@ -8,28 +8,28 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
-import { Roles } from '../../../modules/auth/decorators/roles.decorator.js';
+import { Roles } from '../../auth/decorators/roles.decorator.js';
 import {
   LeaveRequest,
   LeaveBalance,
 } from '../../../../generated/prisma/client.js';
 import { RoleType } from '../../../../generated/prisma/enums.js';
 
-import { LeavesManagerService } from '../services/leaves-manager.service.js';
+import { LeaveManagerService } from '../services/leave-manager.service.js';
 import { ResolveLeaveRequestDto } from '../dto/resolve-leave-request.dto.js';
-import { FilterLeavesDto } from '../dto/filter-leave.dto.js';
+import { FilterLeaveDto } from '../dto/filter-leave.dto.js';
 
 @ApiTags('Leaves - Manager')
 @ApiBearerAuth()
 @Roles(RoleType.MANAGER)
 @Controller('manager/leaves')
-export class LeavesManagerController {
-  constructor(private readonly leavesService: LeavesManagerService) {}
+export class LeaveManagerController {
+  constructor(private readonly leavesService: LeaveManagerService) {}
 
   @Get('requests')
   @ApiOperation({ summary: 'مشاهده لیست تمام درخواست‌های مرخصی سازمان' })
   async getAllRequests(
-    @Query() filters: FilterLeavesDto,
+    @Query() filters: FilterLeaveDto,
   ): Promise<LeaveRequest[]> {
     return await this.leavesService.getAllRequests(filters);
   }

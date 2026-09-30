@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
-import {LeavesEmployeeController} from './controllers/leaves-employee.controller.js'
-import {LeavesManagerController} from './controllers/leaves-manager.controller.js'
-import {LeavesEmployeeService} from './services/leaves-employee.service.js'
-import {LeavesManagerService} from './services/leaves-manager.service.js'
+import { LeaveEmployeeController } from './controllers/leave-employee.controller.js';
+import { LeaveManagerController } from './controllers/leave-manager.controller.js';
+import { LeaveEmployeeService } from './services/leave-employee.service.js';
+import { LeaveManagerService } from './services/leave-manager.service.js';
 
 @Module({
   imports: [],
-  controllers: [LeavesEmployeeController, LeavesManagerController],
-  providers: [LeavesEmployeeService, LeavesManagerService],
+  controllers: [LeaveEmployeeController, LeaveManagerController],
+  providers: [LeaveEmployeeService, LeaveManagerService],
 })
 export class LeaveModule {}

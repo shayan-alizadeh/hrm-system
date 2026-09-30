@@ -19,7 +19,7 @@ import { buildLeaveRequestFilter } from '../utils/leave-request-filter.js';
 import { runLeaveTransaction } from '../utils/leave-transaction.js';
 
 @Injectable()
-export class LeavesEmployeeService {
+export class LeaveEmployeeService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getMyBalance(userId: number, year?: number) {

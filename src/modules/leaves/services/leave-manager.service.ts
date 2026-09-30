@@ -18,7 +18,7 @@ import { buildLeaveRequestFilter } from '../utils/leave-request-filter.js';
 import { runLeaveTransaction } from '../utils/leave-transaction.js';
 
 @Injectable()
-export class LeavesManagerService {
+export class LeaveManagerService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getAllRequests(filters: FilterLeaveDto) {

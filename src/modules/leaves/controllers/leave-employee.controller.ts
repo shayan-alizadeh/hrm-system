@@ -18,16 +18,16 @@ import { RoleType } from '../../../../generated/prisma/enums.js';
 
 import { CurrentUser } from '../../../common/decorators/user.decorator.js';
 
-import { LeavesEmployeeService } from '../services/leaves-employee.service.js';
+import { LeaveEmployeeService } from '../services/leave-employee.service.js';
 import { CreateLeaveRequestDto } from '../dto/create-leave-request.dto.js';
-import { FilterLeavesDto } from '../dto/filter-leave.dto.js';
+import { FilterLeaveDto } from '../dto/filter-leave.dto.js';
 
 @ApiTags('Leaves - Employee')
 @ApiBearerAuth()
 @Roles(RoleType.EMPLOYEE)
 @Controller('employee/leaves')
-export class LeavesEmployeeController {
-  constructor(private readonly leavesService: LeavesEmployeeService) {}
+export class LeaveEmployeeController {
+  constructor(private readonly leavesService: LeaveEmployeeService) {}
 
   @Get('balance')
   @ApiOperation({ summary: 'مشاهده مانده مرخصی استحقاقی امسال من' })
@@ -49,7 +49,7 @@ export class LeavesEmployeeController {
   @Get('requests')
   @ApiOperation({ summary: 'مشاهده لیست درخواست‌های مرخصی من' })
   async getMyRequests(
-    @Query() filters: FilterLeavesDto,
+    @Query() filters: FilterLeaveDto,
     @CurrentUser() user: { id: number },
   ): Promise<LeaveRequest[]> {
     return await this.leavesService.getMyRequests(user.id, filters);
