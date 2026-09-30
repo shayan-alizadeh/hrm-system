@@ -1,11 +1,21 @@
-// src/config/swagger.config.ts
-import { INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import type { OpenAPIObject } from '@nestjs/swagger';
+
 import { AppModule } from '../app.module.js';
 
 type SwaggerScope = 'manager' | 'employee';
 
+/**
+ * فقط مسیرهای مربوط به نقش انتخاب‌شده و مسیرهای مشترک را نگه می‌دارد.
+ *
+ * سند ورودی تغییر نمی‌کند. components حفظ می‌شود تا ارجاع‌های $ref
+ * موجود در مسیرهای باقی‌مانده معتبر بمانند.
+ *
+ * این فیلتر صرفاً نمایش مستندات را محدود می‌کند؛ کنترل دسترسی API
+ * باید توسط guardها انجام شود.
+ */
 function filterSwaggerDocument(
   document: OpenAPIObject,
   scope: SwaggerScope,
@@ -15,45 +25,85 @@ function filterSwaggerDocument(
     '/api/v1/auth',
     '/api/v1/uploads',
   ];
-  for (const path of Object.keys(document.paths)) {
+
+  const paths: OpenAPIObject['paths'] = {};
+
+  for (const [path, pathItem] of Object.entries(document.paths)) {
+    // بررسی مرز مسیر مانع تطبیق manager با مسیرهایی مانند manager-extra است.
     const isAllowed = allowedPrefixes.some(
       (prefix) => path === prefix || path.startsWith(`${prefix}/`),
     );
-    if (!isAllowed) delete document.paths[path];
+
+    if (isAllowed) {
+      paths[path] = pathItem;
+    }
   }
-  return document;
+
+  return {
+    ...document,
+    paths,
+  };
 }
 
+/**
+ * هر سند builder مستقل دارد تا تغییر metadata یک نقش
+ * روی عنوان، توضیحات یا تنظیمات سند نقش دیگر اثر نگذارد.
+ */
+function createSwaggerConfig(
+  title: string,
+  description: string,
+): Omit<OpenAPIObject, 'paths'> {
+  return new DocumentBuilder()
+    .setTitle(title)
+    .setDescription(description)
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+}
+
+/**
+ * مستندات Manager و Employee را در مسیرهای جدا ثبت می‌کند.
+ *
+ * مقدار SWAGGER_ENABLED توسط validateEnvironment به Boolean تبدیل شده است.
+ * پیشوند مسیرها با app.setGlobalPrefix('api/v1') در main.ts هماهنگ است.
+ */
 export function setupSwagger(
   app: INestApplication,
   configService: ConfigService,
 ): void {
-  const swaggerEnabled = configService.get<boolean>('SWAGGER_ENABLED', false); // می‌توانید در .env آن را true کنید
-  if (!swaggerEnabled) return;
+  const swaggerEnabled = configService.getOrThrow<boolean>('SWAGGER_ENABLED');
 
-  const baseConfig = new DocumentBuilder().setVersion('1.0').addBearerAuth();
+  if (!swaggerEnabled) {
+    return;
+  }
 
-  const managerConfig = baseConfig
-    .setTitle('HR API - Manager')
-    .setDescription('API endpoints available to users with the manager role.')
-    .build();
+  const managerConfig = createSwaggerConfig(
+    'HR API - Manager',
+    'API endpoints available to users with the manager role.',
+  );
 
-  const employeeConfig = baseConfig
-    .setTitle('HR API - Employee')
-    .setDescription('API endpoints available to users with the employee role.')
-    .build();
+  const employeeConfig = createSwaggerConfig(
+    'HR API - Employee',
+    'API endpoints available to users with the employee role.',
+  );
 
-  const options = { include: [AppModule], deepScanRoutes: true };
+  // کنترلرهای ماژول‌های واردشده به AppModule نیز بررسی می‌شوند.
+  const documentOptions = {
+    include: [AppModule],
+    deepScanRoutes: true,
+  };
 
-  const managerDoc = filterSwaggerDocument(
-    SwaggerModule.createDocument(app, managerConfig, options),
+  const managerDocument = filterSwaggerDocument(
+    SwaggerModule.createDocument(app, managerConfig, documentOptions),
     'manager',
   );
-  const employeeDoc = filterSwaggerDocument(
-    SwaggerModule.createDocument(app, employeeConfig, options),
+
+  const employeeDocument = filterSwaggerDocument(
+    SwaggerModule.createDocument(app, employeeConfig, documentOptions),
     'employee',
   );
 
-  SwaggerModule.setup('api/v1/manager/docs', app, () => managerDoc);
-  SwaggerModule.setup('api/v1/employee/docs', app, () => employeeDoc);
+  SwaggerModule.setup('api/v1/manager/docs', app, () => managerDocument);
+
+  SwaggerModule.setup('api/v1/employee/docs', app, () => employeeDocument);
 }
