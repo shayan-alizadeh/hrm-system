@@ -1,53 +1,71 @@
+import { Transform } from 'class-transformer';
 import {
-  IsNotEmpty,
-  IsString,
+  IsDefined,
   IsEnum,
-  Matches,
+  IsString,
   MaxLength,
   MinLength,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+
 import { LeaveType } from '../../../../generated/prisma/enums.js';
+import { IsJalaliDate } from '../../../common/validators/is-jalali-date.validator.js';
 
 export class CreateLeaveRequestDto {
   @ApiProperty({
     description: 'نوع مرخصی',
     example: LeaveType.ANNUAL,
     enum: LeaveType,
+    enumName: 'LeaveType',
   })
-  @IsEnum(LeaveType, { message: 'نوع مرخصی نامعتبر است' })
-  @IsNotEmpty({ message: 'انتخاب نوع مرخصی الزامی است' })
+  @IsDefined({ message: 'انتخاب نوع مرخصی الزامی است.' })
+  @IsEnum(LeaveType, { message: 'نوع مرخصی نامعتبر است.' })
   leaveType!: LeaveType;
 
   @ApiProperty({
-    description: 'تاریخ شمسی شروع مرخصی (فرمت: YYYY/MM/DD)',
+    description: 'تاریخ شمسی شروع مرخصی با قالب yyyy/mm/dd',
     example: '1404/09/01',
+    type: String,
+    minLength: 10,
+    maxLength: 10,
   })
-  @IsString({ message: 'تاریخ شروع باید یک رشته متنی باشد' })
-  @Matches(/^(13|14)\d{2}\/(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])$/, {
-    message: 'فرمت تاریخ شروع صحیح نیست (مثال: 1404/09/01)',
+  @IsDefined({ message: 'تاریخ شروع مرخصی الزامی است.' })
+  @IsString({ message: 'تاریخ شروع باید رشته متنی باشد.' })
+  @IsJalaliDate({
+    message: 'تاریخ شروع شمسی معتبر نیست.',
   })
-  @IsNotEmpty({ message: 'تاریخ شروع مرخصی الزامی است' })
   startDate!: string;
 
   @ApiProperty({
-    description: 'تاریخ شمسی پایان مرخصی (فرمت: YYYY/MM/DD)',
+    description: 'تاریخ شمسی پایان مرخصی با قالب yyyy/mm/dd',
     example: '1404/09/03',
+    type: String,
+    minLength: 10,
+    maxLength: 10,
   })
-  @IsString({ message: 'تاریخ پایان باید یک رشته متنی باشد' })
-  @Matches(/^(13|14)\d{2}\/(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])$/, {
-    message: 'فرمت تاریخ پایان صحیح نیست (مثال: 1404/09/03)',
+  @IsDefined({ message: 'تاریخ پایان مرخصی الزامی است.' })
+  @IsString({ message: 'تاریخ پایان باید رشته متنی باشد.' })
+  @IsJalaliDate({
+    message: 'تاریخ پایان شمسی معتبر نیست.',
   })
-  @IsNotEmpty({ message: 'تاریخ پایان مرخصی الزامی است' })
   endDate!: string;
 
   @ApiProperty({
     description: 'دلیل درخواست مرخصی',
     example: 'رسیدگی به امور شخصی و بانکی',
+    minLength: 5,
+    maxLength: 500,
   })
-  @IsString({ message: 'دلیل مرخصی باید متن باشد' })
-  @MinLength(5, { message: 'دلیل مرخصی نمی‌تواند کمتر از ۵ کاراکتر باشد' })
-  @MaxLength(500, { message: 'دلیل مرخصی طولانی‌تر از حد مجاز است' })
-  @IsNotEmpty({ message: 'نوشتن دلیل مرخصی الزامی است' })
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @IsDefined({ message: 'نوشتن دلیل مرخصی الزامی است.' })
+  @IsString({ message: 'دلیل مرخصی باید متن باشد.' })
+  @MinLength(5, {
+    message: 'دلیل مرخصی نمی‌تواند کمتر از ۵ کاراکتر باشد.',
+  })
+  @MaxLength(500, {
+    message: 'دلیل مرخصی نمی‌تواند بیشتر از ۵۰۰ کاراکتر باشد.',
+  })
   reason!: string;
 }

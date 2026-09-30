@@ -1,21 +1,29 @@
 import {
-  Injectable,
-  NotFoundException,
   BadRequestException,
   ConflictException,
+  Injectable,
+  NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service.js';
-import { CreatePayrollDto } from '../dto/create-payroll.dto.js'; // DTO جدید (فقط شامل userId, year, month)
-import { UpdatePayrollDto } from '../dto/update-payroll.dto.js';
-import { FilterPayrollDto } from '../dto/filter-payroll.dto.js';
+
+import { Prisma } from '../../../../generated/prisma/client.js';
 import {
-  PayrollStatus,
+  ContractStatus,
   LeaveStatus,
   LeaveType,
-} from '../../../../generated/prisma/client.js';
-
-// سرویس‌های خارجی که برای هوشمندسازی نیاز داریم
-import { ContractService } from '../../contracts/services/contract.service.js';
+  PayrollStatus,
+} from '../../../../generated/prisma/enums.js';
+import { PrismaService } from '../../../prisma/prisma.service.js';
+import { CreatePayrollDto } from '../dto/create-payroll.dto.js';
+import { FilterPayrollDto } from '../dto/filter-payroll.dto.js';
+import {
+  assertJalaliDate,
+  getPayrollPeriod,
+  isPrismaError,
+  nonNegativeDecimal,
+  rethrowRecordError,
+  runSerializable,
+  toStoredNumber,
+} from '../utils/payroll.utils.js';
 import { PayrollCalculatorService } from './payroll-calculator.service.js';
 
 @Injectable()
@@ -23,128 +31,221 @@ export class PayrollManagerService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly calculatorService: PayrollCalculatorService,
-    private readonly contractsService: ContractService,
   ) {}
 
   /**
-   * صدور فیش حقوقی هوشمند با اتصال به ماژول‌های قرارداد و مرخصی
+   * صدور فیش برای یک ماه کامل.
+   * موارد نیازمند تسهیم قرارداد یا مرخصی، تا تعیین قاعده دقیق رد می‌شوند.
    */
   async create(dto: CreatePayrollDto) {
-    // ۱. جلوگیری از صدور فیش تکراری برای این کارمند در این ماه و سال خاص
-    const existingPayroll = await this.prisma.payroll.findUnique({
-      where: {
-        userId_year_month: {
-          userId: dto.userId,
-          year: dto.year,
-          month: dto.month,
-        },
-      },
-    });
+    const period = getPayrollPeriod(dto.year, dto.month);
 
-    if (existingPayroll) {
-      throw new ConflictException(
-        `فیش حقوقی ماه ${dto.month} سال ${dto.year} قبلاً برای این کارمند صادر شده است.`,
-      );
+    if (
+      !Number.isInteger(dto.userId) ||
+      dto.userId < 1 ||
+      dto.userId > 2_147_483_647
+    ) {
+      throw new BadRequestException('شناسه کاربر نامعتبر است.');
     }
 
-    // ۲. دریافت قرارداد "فعال" کارمند برای استخراج پایه حقوق و مزایا
-    const contract = await this.contractsService.getActiveContractByUserId(
-      dto.userId,
-    );
+    try {
+      return await runSerializable(this.prisma, async (tx) => {
+        const existing = await tx.payroll.findUnique({
+          where: {
+            userId_year_month: {
+              userId: dto.userId,
+              year: dto.year,
+              month: dto.month,
+            },
+          },
+          select: { id: true },
+        });
 
-    // ۳. محاسبه ارزش ریالی یک روز کاری
-    // ماه‌های ۱ تا ۶ = ۳۱ روز، ماه‌های ۷ تا ۱۱ = ۳۰ روز، اسفند = ۲۹ روز (در این پروژه ساده‌سازی شده است)
-    const daysInMonth = dto.month <= 6 ? 31 : dto.month === 12 ? 29 : 30;
-    const dailyBaseRate = contract.baseSalary / daysInMonth;
+        if (existing) {
+          throw new ConflictException(
+            'فیش حقوقی این کاربر برای ماه انتخاب‌شده قبلاً صادر شده است.',
+          );
+        }
 
-    // ۴. استخراج مرخصی‌های بدون حقوق تایید شده در همین ماه از جدول LeaveRequest
-    const monthStr = dto.month.toString().padStart(2, '0');
-    const yearMonthPrefix = `${dto.year}/${monthStr}`; // مثلا "1404/08"
+        const user = await tx.user.findUnique({
+          where: { id: dto.userId },
+          select: { id: true },
+        });
 
-    const unpaidLeavesThisMonth = await this.prisma.leaveRequest.findMany({
-      where: {
-        userId: dto.userId,
-        leaveType: LeaveType.UNPAID,
-        status: LeaveStatus.APPROVED,
-        startDate: { startsWith: yearMonthPrefix },
-      },
-    });
+        if (!user) {
+          throw new NotFoundException('کاربر یافت نشد.');
+        }
 
-    // جمع کل روزهای مرخصی بدون حقوق در این ماه و محاسبه مبلغ کسر آن
-    const unpaidLeaveDays = unpaidLeavesThisMonth.reduce(
-      (sum, req) => sum + req.totalDays,
-      0,
-    );
-    const unpaidLeaveDeduction = unpaidLeaveDays * dailyBaseRate;
+        const activeContracts = await tx.contract.findMany({
+          where: {
+            userId: dto.userId,
+            status: ContractStatus.ACTIVE,
+          },
+        });
 
-    // ۵. تجمیع درآمدهای ناخالص طبق قرارداد (Gross Salary)
-    const totalAllowances =
-      contract.housingAllowance +
-      contract.foodAllowance +
-      contract.childAllowance;
-    const grossSalary = contract.baseSalary + totalAllowances;
+        for (const contract of activeContracts) {
+          assertJalaliDate(contract.startDate);
+          assertJalaliDate(contract.endDate);
 
-    // ۶. محاسبه حق بیمه سهم کارمند (طبق قانون، حق اولاد معمولاً معاف از بیمه است)
-    const insuranceSubjectAmount =
-      contract.baseSalary + contract.housingAllowance + contract.foodAllowance;
-    const insuranceDeduction = this.calculatorService.calculateInsurance(
-      insuranceSubjectAmount,
-    );
+          if (contract.startDate > contract.endDate) {
+            throw new BadRequestException('بازه قرارداد نامعتبر است.');
+          }
+        }
 
-    // ۷. محاسبه مالیات داینامیک
-    // درآمد مشمول مالیات: درآمدهای ناخالص منهای حق بیمه
-    const taxableIncome = grossSalary - insuranceDeduction;
-    const taxDeduction = await this.calculatorService.calculateTax(
-      taxableIncome,
-      dto.year,
-    );
+        const relevantContracts = activeContracts.filter(
+          (contract) =>
+            contract.startDate <= period.endDate &&
+            contract.endDate >= period.startDate,
+        );
 
-    // ۸. محاسبه نهایی پرداختی خالص (Net Salary)
-    const totalDeductions =
-      unpaidLeaveDeduction + insuranceDeduction + taxDeduction;
-    const netSalary = grossSalary - totalDeductions;
+        if (relevantContracts.length === 0) {
+          throw new BadRequestException(
+            'قرارداد فعال مرتبط با ماه انتخاب‌شده یافت نشد.',
+          );
+        }
 
-    if (netSalary < 0) {
-      throw new BadRequestException(
-        'خطا: کسورات این کارمند (احتمالاً به دلیل مرخصی بدون حقوق زیاد) از مجموع درآمدهای او بیشتر شده است!',
-      );
+        if (relevantContracts.length > 1) {
+          throw new BadRequestException(
+            'بیش از یک قرارداد فعال به این ماه مربوط است؛ محاسبه نیازمند تعیین سهم هر قرارداد است.',
+          );
+        }
+
+        const contract = relevantContracts[0];
+
+        if (
+          contract.startDate > period.startDate ||
+          contract.endDate < period.endDate
+        ) {
+          throw new BadRequestException(
+            'قرارداد تمام ماه را پوشش نمی‌دهد؛ قاعده حقوق ماه ناقص باید مشخص شود.',
+          );
+        }
+
+        const unpaidLeaves = await tx.leaveRequest.findMany({
+          where: {
+            userId: dto.userId,
+            leaveType: LeaveType.UNPAID,
+            status: LeaveStatus.APPROVED,
+            startDate: { lte: period.endDate },
+            endDate: { gte: period.startDate },
+          },
+          select: {
+            startDate: true,
+            endDate: true,
+            totalDays: true,
+          },
+        });
+
+        let unpaidDays = new Prisma.Decimal(0);
+
+        for (const leave of unpaidLeaves) {
+          assertJalaliDate(leave.startDate);
+          assertJalaliDate(leave.endDate);
+
+          if (leave.startDate > leave.endDate) {
+            throw new BadRequestException('بازه مرخصی نامعتبر است.');
+          }
+
+          if (
+            leave.startDate < period.startDate ||
+            leave.endDate > period.endDate
+          ) {
+            throw new BadRequestException(
+              'مرخصی بدون حقوق از مرز ماه عبور کرده است؛ سهم روزهای قابل کسر هر ماه باید مشخص شود.',
+            );
+          }
+
+          unpaidDays = unpaidDays.plus(
+            nonNegativeDecimal(leave.totalDays, 'تعداد روزهای مرخصی'),
+          );
+        }
+
+        if (unpaidDays.greaterThan(period.daysInMonth)) {
+          throw new BadRequestException(
+            'جمع مرخصی بدون حقوق از تعداد روزهای ماه بیشتر است.',
+          );
+        }
+
+        const baseSalary = nonNegativeDecimal(contract.baseSalary, 'حقوق پایه');
+        const housing = nonNegativeDecimal(
+          contract.housingAllowance,
+          'حق مسکن',
+        );
+        const food = nonNegativeDecimal(contract.foodAllowance, 'بن کارگری');
+        const child = nonNegativeDecimal(contract.childAllowance, 'حق اولاد');
+
+        const totalAllowances = housing.plus(food).plus(child);
+        const grossSalary = baseSalary.plus(totalAllowances);
+
+        const unpaidLeaveDeduction = baseSalary
+          .times(unpaidDays)
+          .dividedBy(period.daysInMonth);
+
+        // مبنای بیمه و مالیات نسخه قبلی حفظ شده است.
+        const insuranceDeduction = this.calculatorService.calculateInsurance(
+          baseSalary.plus(housing).plus(food),
+        );
+
+        const taxableIncome = grossSalary.minus(insuranceDeduction);
+        const taxDeduction = await this.calculatorService.calculateTax(
+          taxableIncome,
+          dto.year,
+          tx,
+        );
+
+        const netSalary = grossSalary
+          .minus(unpaidLeaveDeduction)
+          .minus(insuranceDeduction)
+          .minus(taxDeduction);
+
+        if (netSalary.isNegative()) {
+          throw new BadRequestException(
+            'مجموع کسورات از درآمد ناخالص بیشتر است.',
+          );
+        }
+
+        return tx.payroll.create({
+          data: {
+            userId: dto.userId,
+            year: dto.year,
+            month: dto.month,
+            baseSalary: toStoredNumber(baseSalary),
+            totalAllowances: toStoredNumber(totalAllowances),
+            grossSalary: toStoredNumber(grossSalary),
+            taxDeduction,
+            insuranceDeduction,
+            unpaidLeaveDeduction: toStoredNumber(unpaidLeaveDeduction),
+            netSalary: toStoredNumber(netSalary),
+            status: PayrollStatus.PENDING,
+          },
+        });
+      });
+    } catch (error: unknown) {
+      // قید یکتای دیتابیس، آخرین لایه جلوگیری از صدور تکراری است.
+      if (isPrismaError(error, 'P2002')) {
+        throw new ConflictException(
+          'فیش حقوقی این کاربر برای ماه انتخاب‌شده قبلاً صادر شده است.',
+        );
+      }
+
+      throw error;
     }
-
-    // ۹. ایجاد رکورد نهایی در دیتابیس (مدل جدید Payroll)
-    return await this.prisma.payroll.create({
-      data: {
-        userId: dto.userId,
-        year: dto.year,
-        month: dto.month,
-
-        baseSalary: contract.baseSalary,
-        totalAllowances,
-        grossSalary,
-
-        taxDeduction,
-        insuranceDeduction,
-        unpaidLeaveDeduction,
-
-        netSalary,
-
-        status: PayrollStatus.PENDING,
-      },
-    });
   }
 
-  // متدهای findAll, findOne, remove مانند قبل هستند
   async findAll(filters: FilterPayrollDto) {
-    return await this.prisma.payroll.findMany({
+    return this.prisma.payroll.findMany({
       where: {
-        ...(filters.userId && { userId: filters.userId }),
-        ...(filters.year && { year: filters.year }),
-        ...(filters.month && { month: filters.month }),
-        ...(filters.status && { status: filters.status }),
+        ...(filters.userId !== undefined && { userId: filters.userId }),
+        ...(filters.year !== undefined && { year: filters.year }),
+        ...(filters.month !== undefined && { month: filters.month }),
+        ...(filters.status !== undefined && { status: filters.status }),
       },
       include: {
-        user: { select: { id: true, firstName: true, lastName: true } },
+        user: {
+          select: { id: true, firstName: true, lastName: true },
+        },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     });
   }
 
@@ -152,49 +253,59 @@ export class PayrollManagerService {
     const payroll = await this.prisma.payroll.findUnique({
       where: { id },
       include: {
-        user: { select: { id: true, firstName: true, lastName: true } },
+        user: {
+          select: { id: true, firstName: true, lastName: true },
+        },
       },
-    });
-
-    if (!payroll) throw new NotFoundException('فیش حقوقی یافت نشد.');
-    return payroll;
-  }
-
-  async remove(id: number) {
-    const existing = await this.prisma.payroll.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException('فیش حقوقی یافت نشد.');
-    await this.prisma.payroll.delete({ where: { id } });
-  }
-
-  /**
-   * تغییر وضعیت فیش حقوقی (مثلاً از PENDING به PAID) توسط بخش مالی
-   */
-  async changeStatus(id: number, status: PayrollStatus) {
-    const payroll = await this.prisma.payroll.findUnique({
-      where: { id },
     });
 
     if (!payroll) {
-      throw new NotFoundException('فیش حقوقی مورد نظر یافت نشد.');
+      throw new NotFoundException('فیش حقوقی یافت نشد.');
     }
 
-    if (payroll.status === status) {
-      throw new BadRequestException(
-        `این فیش حقوقی در حال حاضر در وضعیت ${status} قرار دارد.`,
-      );
+    return payroll;
+  }
+
+  async remove(id: number): Promise<void> {
+    try {
+      await this.prisma.payroll.delete({ where: { id } });
+    } catch (error: unknown) {
+      rethrowRecordError(error, 'فیش حقوقی یافت نشد.');
+    }
+  }
+
+  /**
+   * بررسی وضعیت قبلی و ثبت وضعیت جدید باید اتمیک باشد.
+   * بازگشت PAID به PENDING مطابق رفتار قبلی مجاز باقی مانده است.
+   */
+  async changeStatus(id: number, status: PayrollStatus) {
+    if (status !== PayrollStatus.PENDING && status !== PayrollStatus.PAID) {
+      throw new BadRequestException('وضعیت فیش حقوقی نامعتبر است.');
     }
 
-    // اگر وضعیت به پرداخت‌شده تغییر کند، تاریخ امروز به عنوان زمان واریز ثبت می‌شود
-    // اگر دوباره به PENDING برگردد (مثلاً به خاطر خطای بانکی)، تاریخ پرداخت پاک می‌شود
-    const paymentDate = status === PayrollStatus.PAID ? new Date() : null;
+    return runSerializable(this.prisma, async (tx) => {
+      const payroll = await tx.payroll.findUnique({
+        where: { id },
+      });
 
-    return await this.prisma.payroll.update({
-      where: { id },
-      data: {
-        status,
-        paymentDate,
-      },
+      if (!payroll) {
+        throw new NotFoundException('فیش حقوقی یافت نشد.');
+      }
+
+      if (payroll.status === status) {
+        throw new BadRequestException(
+          'فیش حقوقی از قبل در وضعیت درخواستی قرار دارد.',
+        );
+      }
+
+      return tx.payroll.update({
+        where: { id },
+        data: {
+          status,
+          // این زمان، زمان ثبت وضعیت پرداخت در سامانه است.
+          paymentDate: status === PayrollStatus.PAID ? new Date() : null,
+        },
+      });
     });
   }
-  
 }

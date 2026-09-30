@@ -1,31 +1,41 @@
-import {
-  IsNotEmpty,
-  IsString,
-  Matches,
-  MaxLength,
-  MinLength,
-} from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsDefined, IsString, MaxLength, MinLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+
+import { IsJalaliDate } from '../../../common/validators/is-jalali-date.validator.js';
 
 export class CreateHolidayDto {
   @ApiProperty({
-    description: 'تاریخ تعطیلی (فرمت: YYYY/MM/DD)',
+    description: 'تاریخ معتبر شمسی با قالب yyyy/mm/dd',
     example: '1404/01/01',
+    type: String,
+    minLength: 10,
+    maxLength: 10,
   })
-  @IsString({ message: 'تاریخ باید یک رشته متنی باشد' })
-  @Matches(/^(13|14)\d{2}\/(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])$/, {
-    message: 'فرمت تاریخ صحیح نیست (مثال: 1404/01/01)',
+  @IsDefined({ message: 'تاریخ تعطیلی الزامی است.' })
+  @IsString({ message: 'تاریخ باید رشته متنی باشد.' })
+  @IsJalaliDate({
+    message: 'تاریخ شمسی نامعتبر است؛ نمونه صحیح: 1404/01/01.',
   })
-  @IsNotEmpty({ message: 'تاریخ الزامی است' })
   date!: string;
 
   @ApiProperty({
     description: 'عنوان مناسبت',
-    example: 'عید باستانی نوروز',
+    example: 'عید نوروز',
+    minLength: 3,
+    maxLength: 100,
   })
-  @IsString({ message: 'عنوان باید متن باشد' })
-  @MinLength(3, { message: 'عنوان نمی‌تواند کمتر از ۳ کاراکتر باشد' })
-  @MaxLength(100, { message: 'عنوان نمی‌تواند بیشتر از ۱۰۰ کاراکتر باشد' })
-  @IsNotEmpty({ message: 'عنوان مناسبت الزامی است' })
+  // فاصله‌های ابتدا و انتها پیش از بررسی طول حذف می‌شوند.
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @IsDefined({ message: 'عنوان مناسبت الزامی است.' })
+  @IsString({ message: 'عنوان باید متن باشد.' })
+  @MinLength(3, {
+    message: 'عنوان نمی‌تواند کمتر از ۳ کاراکتر باشد.',
+  })
+  @MaxLength(100, {
+    message: 'عنوان نمی‌تواند بیشتر از ۱۰۰ کاراکتر باشد.',
+  })
   title!: string;
 }

@@ -17,7 +17,7 @@ import { RoleType } from '../../../../generated/prisma/enums.js';
 
 import { LeavesManagerService } from '../services/leaves-manager.service.js';
 import { ResolveLeaveRequestDto } from '../dto/resolve-leave-request.dto.js';
-import { FilterLeavesDto } from '../dto/filter-leaves.dto.js';
+import { FilterLeavesDto } from '../dto/filter-leave.dto.js';
 
 @ApiTags('Leaves - Manager')
 @ApiBearerAuth()

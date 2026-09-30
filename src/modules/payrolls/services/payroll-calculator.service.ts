@@ -1,59 +1,79 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
+
+import { Prisma } from '../../../../generated/prisma/client.js';
 import { PrismaService } from '../../../prisma/prisma.service.js';
+import {
+  assertPayrollYear,
+  assertValidTaxBands,
+  nonNegativeDecimal,
+  toStoredNumber,
+} from '../utils/payroll.utils.js';
 
 @Injectable()
 export class PayrollCalculatorService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * محاسبه داینامیک مالیات پلکانی با اتصال به دیتابیس
+   * مالیات پلکانی را بر مبنای قواعد ثبت‌شده محاسبه می‌کند.
+   * در زمان صدور فیش، client باید همان کلاینت تراکنش صدور باشد.
    */
-  async calculateTax(taxableIncome: number, year: number): Promise<number> {
-    // ۱. دریافت قوانین مالیاتی آن سال (مرتب شده از کف به سقف)
-    const rules = await this.prisma.taxRule.findMany({
+  async calculateTax(
+    taxableIncome: number | Prisma.Decimal,
+    year: number,
+    client: Pick<Prisma.TransactionClient, 'taxRule'> = this.prisma,
+  ): Promise<number> {
+    assertPayrollYear(year);
+    const income = nonNegativeDecimal(taxableIncome, 'درآمد مشمول مالیات');
+
+    const rules = await client.taxRule.findMany({
       where: { year },
       orderBy: { minIncome: 'asc' },
     });
 
-    if (!rules || rules.length === 0) {
+    if (rules.length === 0) {
       throw new BadRequestException(
-        `قوانین مالیاتی برای سال ${year} هنوز در سیستم تعریف نشده است. لطفاً ابتدا پله‌های مالیاتی را وارد کنید.`,
+        `قوانین مالیاتی سال ${year} تعریف نشده است.`,
       );
     }
 
-    let totalTax = 0;
+    // داده‌های قدیمی نیز ممکن است پیش از اضافه شدن اعتبارسنجی ثبت شده باشند.
+    assertValidTaxBands(rules);
 
-    // ۲. الگوریتم محاسبه پلکانی
+    let totalTax = new Prisma.Decimal(0);
+
     for (const rule of rules) {
-      // چون در دیتابیس از نوع Float استفاده کردیم، مقادیر به صورت خودکار Number هستند
-      const minIncome = rule.minIncome;
+      const minimum = new Prisma.Decimal(rule.minIncome);
 
-      // آیا درآمد شخص به این پله می‌رسد؟
-      if (taxableIncome > minIncome) {
-        // اگر این پله سقف داشت، مینیممِ (درآمد شخص یا سقف پله) را می‌گیریم
-        // اگر سقف نداشت (null)، یعنی تا بی‌نهایت، پس کل درآمد را مبنا قرار می‌دهیم
-        const maxLimit =
-          rule.maxIncome !== null ? rule.maxIncome : taxableIncome;
-        const upperLimit = Math.min(taxableIncome, maxLimit);
-
-        // مبلغی که در این پله خاص مشمول مالیات می‌شود
-        const applicableIncome = upperLimit - minIncome;
-
-        if (applicableIncome > 0) {
-          // محاسبه مالیات این پله و اضافه کردن به جمع کل
-          totalTax += applicableIncome * (rule.percentage / 100);
-        }
+      if (income.lessThanOrEqualTo(minimum)) {
+        break;
       }
+
+      const upperLimit =
+        rule.maxIncome === null
+          ? income
+          : Prisma.Decimal.min(income, rule.maxIncome);
+
+      const applicableIncome = upperLimit.minus(minimum);
+
+      totalTax = totalTax.plus(
+        applicableIncome.times(rule.percentage).dividedBy(100),
+      );
     }
 
-    return Math.floor(totalTax); // حذف اعشار برای مبالغ ریالی
+    // سیاست گرد کردن قبلی حفظ شده است: حذف اعشار پس از جمع تمام پله‌ها.
+    return toStoredNumber(totalTax.floor());
   }
 
   /**
-   * محاسبه حق بیمه سهم کارمند (۷ درصد)
-   * @param insuranceSubjectAmount مجموع حقوق پایه، حق مسکن و بن کارگری
+   * نرخ ۷ درصد، سیاست فعلی برنامه است.
+   * تعیین اقلام مشمول بیمه بر عهده منطق صدور فیش است.
    */
-  calculateInsurance(insuranceSubjectAmount: number): number {
-    return Math.floor(insuranceSubjectAmount * 0.07);
+  calculateInsurance(insuranceSubjectAmount: number | Prisma.Decimal): number {
+    const amount = nonNegativeDecimal(
+      insuranceSubjectAmount,
+      'مبلغ مشمول بیمه',
+    );
+
+    return toStoredNumber(amount.times('0.07').floor());
   }
 }

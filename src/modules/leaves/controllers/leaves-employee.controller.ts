@@ -20,7 +20,7 @@ import { CurrentUser } from '../../../common/decorators/user.decorator.js';
 
 import { LeavesEmployeeService } from '../services/leaves-employee.service.js';
 import { CreateLeaveRequestDto } from '../dto/create-leave-request.dto.js';
-import { FilterLeavesDto } from '../dto/filter-leaves.dto.js';
+import { FilterLeavesDto } from '../dto/filter-leave.dto.js';
 
 @ApiTags('Leaves - Employee')
 @ApiBearerAuth()

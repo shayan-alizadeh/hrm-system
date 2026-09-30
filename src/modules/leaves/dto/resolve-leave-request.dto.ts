@@ -1,32 +1,32 @@
-import {
-  IsNotEmpty,
-  IsString,
-  IsEnum,
-  IsOptional,
-  IsIn,
-} from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsDefined, IsIn, IsOptional, IsString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
 import { LeaveStatus } from '../../../../generated/prisma/enums.js';
 
 export class ResolveLeaveRequestDto {
   @ApiProperty({
-    description: 'وضعیت جدید درخواست (فقط تایید یا رد)',
+    description: 'نتیجه بررسی درخواست؛ فقط تأیید یا رد',
     example: LeaveStatus.APPROVED,
-    // مدیر نمی‌تواند وضعیت را به PENDING برگرداند یا CANCELED کند
     enum: [LeaveStatus.APPROVED, LeaveStatus.REJECTED],
   })
+  @IsDefined({ message: 'انتخاب وضعیت الزامی است.' })
   @IsIn([LeaveStatus.APPROVED, LeaveStatus.REJECTED], {
-    message:
-      'مدیر فقط می‌تواند درخواست را تایید (APPROVED) یا رد (REJECTED) کند',
+    message: 'مدیر فقط می‌تواند درخواست را تأیید یا رد کند.',
   })
-  @IsNotEmpty({ message: 'انتخاب وضعیت الزامی است' })
-  status!: LeaveStatus;
+  status!: typeof LeaveStatus.APPROVED | typeof LeaveStatus.REJECTED;
 
   @ApiPropertyOptional({
-    description: 'یادداشت مدیر (مثلاً دلیل رد شدن مرخصی)',
+    description:
+      'یادداشت مدیر؛ حذف فیلد یعنی عدم تغییر و null یعنی خالی کردن یادداشت.',
     example: 'با توجه به حجم کاری پایان ماه، با مرخصی موافقت نمی‌شود.',
+    type: String,
+    nullable: true,
   })
-  @IsString({ message: 'یادداشت مدیر باید متن باشد' })
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   @IsOptional()
-  managerNote?: string;
+  @IsString({ message: 'یادداشت مدیر باید متن یا null باشد.' })
+  managerNote?: string | null;
 }

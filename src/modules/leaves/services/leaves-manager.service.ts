@@ -1,28 +1,44 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service.js'; 
-import { FilterLeavesDto } from '../dto/filter-leaves.dto.js';
+
+import type { Prisma } from '../../../../generated/prisma/client.js';
+import { LeaveStatus, LeaveType } from '../../../../generated/prisma/enums.js';
+import { PrismaService } from '../../../prisma/prisma.service.js';
+import { FilterLeaveDto } from '../dto/filter-leave.dto.js';
 import { ResolveLeaveRequestDto } from '../dto/resolve-leave-request.dto.js';
-import { LeaveStatus, LeaveType } from '../../../../generated/prisma/client.js';
+import {
+  calculateLeaveDays,
+  ensureLeaveBalance,
+} from '../utils/leave-calendar.js';
+import { buildLeaveRequestFilter } from '../utils/leave-request-filter.js';
+import { runLeaveTransaction } from '../utils/leave-transaction.js';
 
 @Injectable()
 export class LeavesManagerService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getAllRequests(filters: FilterLeavesDto) {
-    return await this.prisma.leaveRequest.findMany({
+  async getAllRequests(filters: FilterLeaveDto) {
+    return this.prisma.leaveRequest.findMany({
       where: {
-        ...(filters.userId && { userId: filters.userId }),
-        ...(filters.status && { status: filters.status }),
-        ...(filters.leaveType && { leaveType: filters.leaveType }),
+        ...buildLeaveRequestFilter(filters),
+        ...(filters.userId !== undefined && {
+          userId: filters.userId,
+        }),
       },
       include: {
-        user: { select: { id: true, firstName: true, lastName: true } },
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     });
   }
 
@@ -30,87 +46,161 @@ export class LeavesManagerService {
     const request = await this.prisma.leaveRequest.findUnique({
       where: { id },
       include: {
-        user: { select: { id: true, firstName: true, lastName: true } },
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
       },
     });
 
-    if (!request) throw new NotFoundException('درخواست مرخصی یافت نشد.');
+    if (!request) {
+      throw new NotFoundException('درخواست مرخصی یافت نشد.');
+    }
+
     return request;
   }
 
   async resolveRequest(id: number, dto: ResolveLeaveRequestDto) {
-    const request = await this.prisma.leaveRequest.findUnique({
-      where: { id },
-    });
-
-    if (!request) throw new NotFoundException('درخواست مرخصی یافت نشد.');
-
-    if (request.status !== LeaveStatus.PENDING) {
+    if (
+      dto.status !== LeaveStatus.APPROVED &&
+      dto.status !== LeaveStatus.REJECTED
+    ) {
       throw new BadRequestException(
-        'این درخواست قبلاً بررسی شده یا توسط کارمند لغو شده است.',
+        'نتیجه بررسی فقط می‌تواند APPROVED یا REJECTED باشد.',
       );
     }
 
-    // استفاده از تراکنش (Transaction) برای اطمینان از یکپارچگی داده‌ها
-    return await this.prisma.$transaction(async (tx) => {
-      // اگر مدیر مرخصی استحقاقی را تایید کرد، باید از موجودی کارمند کسر کنیم
-      if (
-        dto.status === LeaveStatus.APPROVED &&
-        request.leaveType === LeaveType.ANNUAL
-      ) {
-        // ۱. استخراج سال از تاریخ درخواست (مثلا 1404)
-        const requestYear = parseInt(request.startDate.split('/')[0], 10);
+    return runLeaveTransaction(this.prisma, async (tx) => {
+      const request = await tx.leaveRequest.findUnique({
+        where: { id },
+      });
 
-        // ۲. استفاده از کلید ترکیبی userId_year به جای userId به تنهایی
-        const balance = await tx.leaveBalance.findUnique({
-          where: {
-            userId_year: {
-              userId: request.userId,
-              year: requestYear,
-            },
-          },
-        });
+      if (!request) {
+        throw new NotFoundException('درخواست مرخصی یافت نشد.');
+      }
 
-        if (
-          !balance ||
-          balance.totalDays - balance.usedDays < request.totalDays
-        ) {
-          throw new BadRequestException(
-            `کارمند مورد نظر در سال ${requestYear} موجودی مرخصی کافی ندارد.`,
+      if (request.status !== LeaveStatus.PENDING) {
+        throw new BadRequestException('درخواست قبلاً بررسی یا لغو شده است.');
+      }
+
+      if (dto.status === LeaveStatus.APPROVED) {
+        const calculation = await calculateLeaveDays(
+          tx,
+          request.startDate,
+          request.endDate,
+        );
+
+        // تعداد روزهای درخواست بدون اطلاع کارمند تغییر داده نمی‌شود.
+        if (calculation.totalDays !== request.totalDays) {
+          throw new ConflictException(
+            'تعداد روزهای درخواست با تقویم فعلی سازگار نیست؛ درخواست باید با محاسبه جدید ثبت شود.',
           );
         }
 
-        // ۳. کسر از موجودی با استفاده از کلید ترکیبی
-        await tx.leaveBalance.update({
+        const overlapping = await tx.leaveRequest.findFirst({
           where: {
-            userId_year: {
-              userId: request.userId,
-              year: requestYear,
-            },
+            id: { not: id },
+            userId: request.userId,
+            status: LeaveStatus.APPROVED,
+            startDate: { lte: request.endDate },
+            endDate: { gte: request.startDate },
           },
-          data: {
-            usedDays: balance.usedDays + request.totalDays,
-          },
+          select: { id: true },
         });
+
+        if (overlapping) {
+          throw new ConflictException(
+            'بازه درخواست با یک مرخصی تأییدشده هم‌پوشانی دارد.',
+          );
+        }
+
+        const tracksBalance =
+          request.leaveType === LeaveType.ANNUAL ||
+          request.leaveType === LeaveType.SICK ||
+          request.leaveType === LeaveType.UNPAID;
+
+        if (tracksBalance) {
+          for (const [year, days] of calculation.daysByYear) {
+            const balance = await ensureLeaveBalance(tx, request.userId, year);
+
+            const data: Prisma.LeaveBalanceUpdateInput = {};
+
+            switch (request.leaveType) {
+              case LeaveType.ANNUAL: {
+                const remaining = balance.totalDays - balance.usedDays;
+
+                if (!Number.isFinite(remaining) || remaining < days) {
+                  throw new BadRequestException(
+                    `موجودی مرخصی استحقاقی سال ${year} کافی نیست.`,
+                  );
+                }
+
+                data.usedDays = { increment: days };
+                break;
+              }
+
+              case LeaveType.SICK:
+                data.usedSickDays = { increment: days };
+                break;
+
+              case LeaveType.UNPAID:
+                data.usedUnpaidDays = { increment: days };
+                break;
+            }
+
+            await tx.leaveBalance.update({
+              where: {
+                userId_year: {
+                  userId: request.userId,
+                  year,
+                },
+              },
+              data,
+            });
+          }
+        }
       }
 
-      // ۴. آپدیت وضعیت خود درخواست مرخصی
-      return await tx.leaveRequest.update({
-        where: { id },
+      // شکست تغییر وضعیت، تغییرات موجودی را نیز rollback می‌کند.
+      const result = await tx.leaveRequest.updateMany({
+        where: {
+          id,
+          status: LeaveStatus.PENDING,
+        },
         data: {
           status: dto.status,
-          managerNote: dto.managerNote,
-          resolvedAt: new Date(), // ثبت زمان دقیق بررسی مدیر
+          ...(dto.managerNote !== undefined && {
+            managerNote: dto.managerNote,
+          }),
+          resolvedAt: new Date(),
         },
+      });
+
+      if (result.count !== 1) {
+        throw new ConflictException('وضعیت درخواست هم‌زمان تغییر کرده است.');
+      }
+
+      return tx.leaveRequest.findUniqueOrThrow({
+        where: { id },
       });
     });
   }
 
   async getAllBalances() {
-    return await this.prisma.leaveBalance.findMany({
+    return this.prisma.leaveBalance.findMany({
       include: {
-        user: { select: { id: true, firstName: true, lastName: true } },
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
       },
+      orderBy: [{ year: 'desc' }, { userId: 'asc' }],
     });
   }
 }

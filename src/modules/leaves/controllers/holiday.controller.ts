@@ -9,18 +9,14 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiTags,
-  ApiOperation,
-  ApiQuery,
-} from '@nestjs/swagger';
-import { Roles } from '../../auth/decorators/roles.decorator.js';
-import { RoleType } from '../../../../generated/prisma/enums.js';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
-import { HolidayService } from '../services/holiday.service.js';
+import { RoleType } from '../../../../generated/prisma/enums.js';
+import { Roles } from '../../auth/decorators/roles.decorator.js';
 import { CreateHolidayDto } from '../dto/create-holiday.dto.js';
+import { FilterHolidaysDto } from '../dto/filter-holidays.dto.js';
 import { UpdateHolidayDto } from '../dto/update-holiday.dto.js';
+import { HolidayService } from '../services/holiday.service.js';
 
 @ApiTags('Holidays (Manager Only)')
 @ApiBearerAuth()
@@ -30,40 +26,35 @@ export class HolidayController {
   constructor(private readonly holidayService: HolidayService) {}
 
   @Post()
-  @ApiOperation({ summary: 'ثبت یک تعطیلی جدید در تقویم سیستم' })
+  @ApiOperation({ summary: 'ثبت تعطیلی در تقویم سیستم' })
   async create(@Body() dto: CreateHolidayDto) {
-    return await this.holidayService.create(dto);
+    return this.holidayService.create(dto);
   }
 
   @Get()
-  @ApiOperation({ summary: 'دریافت لیست تمام تعطیلات' })
-  @ApiQuery({
-    name: 'year',
-    required: false,
-    description: 'فیلتر بر اساس سال (مثلاً 1404)',
-  })
-  async findAll(@Query('year') year?: string) {
-    return await this.holidayService.findAll(year);
+  @ApiOperation({ summary: 'دریافت تعطیلات با فیلتر سال' })
+  async findAll(@Query() filters: FilterHolidaysDto) {
+    return this.holidayService.findAll(filters.year);
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'دریافت جزئیات یک تعطیلی خاص' })
+  @ApiOperation({ summary: 'دریافت جزئیات تعطیلی' })
   async findOne(@Param('id', ParseIntPipe) id: number) {
-    return await this.holidayService.findOne(id);
+    return this.holidayService.findOne(id);
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'ویرایش اطلاعات یک تعطیلی' })
+  @ApiOperation({ summary: 'ویرایش تعطیلی' })
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateHolidayDto,
   ) {
-    return await this.holidayService.update(id, dto);
+    return this.holidayService.update(id, dto);
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'حذف یک تعطیلی از تقویم' })
+  @ApiOperation({ summary: 'حذف تعطیلی' })
   async remove(@Param('id', ParseIntPipe) id: number) {
-    return await this.holidayService.remove(id);
+    return this.holidayService.remove(id);
   }
 }

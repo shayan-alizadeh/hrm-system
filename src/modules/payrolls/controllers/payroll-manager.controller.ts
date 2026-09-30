@@ -9,16 +9,14 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
-import { Roles } from '../../auth/decorators/roles.decorator.js';
-import {
-  RoleType,
-  PayrollStatus,
-} from '../../../../generated/prisma/client.js';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
-import { PayrollManagerService } from '../services/payroll-manager.service.js';
+import { RoleType } from '../../../../generated/prisma/enums.js';
+import { Roles } from '../../auth/decorators/roles.decorator.js';
+import { ChangePayrollStatusDto } from '../dto/change-payroll-status.dto.js';
 import { CreatePayrollDto } from '../dto/create-payroll.dto.js';
 import { FilterPayrollDto } from '../dto/filter-payroll.dto.js';
+import { PayrollManagerService } from '../services/payroll-manager.service.js';
 
 @ApiTags('Payroll - Manager')
 @ApiBearerAuth()
@@ -29,38 +27,39 @@ export class PayrollManagerController {
 
   @Post()
   @ApiOperation({
-    summary: 'صدور هوشمند فیش حقوقی با احتساب قرارداد و مرخصی‌ها',
+    summary: 'صدور فیش حقوقی با احتساب قرارداد و مرخصی‌ها',
   })
   async create(@Body() dto: CreatePayrollDto) {
-    return await this.payrollManagerService.create(dto);
+    return this.payrollManagerService.create(dto);
   }
 
   @Get()
-  @ApiOperation({
-    summary: 'دریافت لیست تمام فیش‌های حقوقی صادر شده (با فیلتر)',
-  })
+  @ApiOperation({ summary: 'دریافت فیش‌های حقوقی با فیلتر' })
   async findAll(@Query() filters: FilterPayrollDto) {
-    return await this.payrollManagerService.findAll(filters);
+    return this.payrollManagerService.findAll(filters);
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'دریافت جزئیات کامل یک فیش حقوقی' })
+  @ApiOperation({ summary: 'دریافت جزئیات فیش حقوقی' })
   async findOne(@Param('id', ParseIntPipe) id: number) {
-    return await this.payrollManagerService.findOne(id);
+    return this.payrollManagerService.findOne(id);
   }
 
   @Patch(':id/status')
-  @ApiOperation({ summary: 'تغییر وضعیت فیش حقوقی (مثلاً به پرداخت‌‌شده)' })
+  @ApiOperation({ summary: 'تغییر وضعیت فیش حقوقی' })
   async changeStatus(
     @Param('id', ParseIntPipe) id: number,
-    @Body('status') status: PayrollStatus, // فرض بر این است که وضعیت در بادی ارسال می‌شود
+    @Body() dto: ChangePayrollStatusDto,
   ) {
-    return await this.payrollManagerService.changeStatus(id, status);
+    // DTO باعث می‌شود ValidationPipe واقعاً وضعیت را اعتبارسنجی کند.
+    return this.payrollManagerService.changeStatus(id, dto.status);
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'حذف یک فیش حقوقی' })
+  @ApiOperation({ summary: 'حذف فیش حقوقی' })
   async remove(@Param('id', ParseIntPipe) id: number) {
-    return await this.payrollManagerService.remove(id);
+    await this.payrollManagerService.remove(id);
+
+    return { message: 'فیش حقوقی با موفقیت حذف شد.' };
   }
 }
