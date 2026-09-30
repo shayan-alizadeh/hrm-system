@@ -58,14 +58,17 @@ model User {
 }
 
 model RefreshToken {
-  id        Int    @id @default(autoincrement())
-  tokenHash String @db.VarChar(255) // طول مشخص برای هش
-  userId    Int
-  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade , map: "fk_refresh_token_user") // اضافه شدن Cascade برای خروج خودکار در صورت حذف کاربر
+  // تغییر به نوع String و استفاده از UUID برای پشتیبانی از تولید شناسه کلاینت‌ساید/سرورساید امن
+  id         String   @id @default(uuid()) @db.VarChar(36)
+  
+  tokenHash  String   @db.VarChar(255)
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade, map: "fk_refresh_token_user")
 
-  createdAt DateTime  @default(now())
-  revokedAt DateTime?
+  createdAt  DateTime @default(now())
+  revokedAt  DateTime?
 
+  @@index([userId]) 
   @@map("refresh_tokens")
 }
 

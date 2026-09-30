@@ -1,33 +1,31 @@
-// src/main.ts
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 
 import { AppModule } from './app.module.js';
 import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor.js';
-import { setupSwagger } from './config/swagger.config.js'; // انتقال منطق Swagger به فایل مجزا
+import { setupSwagger } from './config/swagger.config.js';
 
 async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
 
-  // تبدیل صریح به عدد (در صورت عدم وجود تبدیل در validation)
-  const port = parseInt(configService.get<string>('PORT', '3000'), 10);
-  const appName = configService.get<string>('APP_NAME', 'HR API');
+  // تبدیل نوع، اعتبارسنجی و مقادیر پیش‌فرض در validateEnvironment اعمال می‌شوند.
+  const port = configService.getOrThrow<number>('PORT');
+  const appName = configService.getOrThrow<string>('APP_NAME');
 
+  // امکان اجرای lifecycle hookهای پاک‌سازی هنگام دریافت سیگنال توقف.
   app.enableShutdownHooks();
+
   app.setGlobalPrefix('api/v1');
 
-  // رفع باگ بحرانی CORS: استفاده از مقدار پیش‌فرض در صورت نبود متغیر در env
-  const corsOriginsString = configService.get<string>('CORS_ORIGINS', '*');
-  const corsOrigins =
-    corsOriginsString === '*'
-      ? '*'
-      : corsOriginsString
-          .split(',')
-          .map((origin) => origin.trim())
-          .filter(Boolean);
+  // اعتبار originها پیش از راه‌اندازی برنامه بررسی شده است.
+  // با فعال بودن credentials، استفاده از wildcard مجاز نیست.
+  const corsOrigins = configService
+    .getOrThrow<string>('CORS_ORIGINS')
+    .split(',')
+    .map((origin) => origin.trim());
 
   app.enableCors({
     origin: corsOrigins,
@@ -38,19 +36,25 @@ async function bootstrap(): Promise<void> {
 
   app.useGlobalPipes(
     new ValidationPipe({
+      // فیلدهای فاقد decorator اعتبارسنجی در DTO پذیرفته نمی‌شوند.
       whitelist: true,
       forbidNonWhitelisted: true,
-      transform: true, // تبدیل خودکار تایپ‌ها (مثلا string به number در DTO)
-      validationError: { target: false, value: false },
+
+      // ساخت instance از DTO؛ تبدیل فیلدهای داخلی باید در DTO تعریف شود.
+      transform: true,
+
+      // جلوگیری از بازگرداندن شیء ورودی و مقدار فیلد در جزئیات خطا.
+      validationError: {
+        target: false,
+        value: false,
+      },
     }),
   );
 
+  // این روش ثبت برای interceptor بدون وابستگی تزریقی مناسب است.
   app.useGlobalInterceptors(new TransformResponseInterceptor());
 
-  // پیشنهاد: اضافه کردن یک فیلتر یکپارچه برای خطاها
-  // app.useGlobalFilters(new GlobalExceptionFilter());
-
-  // راه‌اندازی Swagger از طریق فایل تنظیمات جداگانه
+  // تصمیم درباره فعال بودن Swagger در تابع تنظیمات آن گرفته می‌شود.
   setupSwagger(app, configService);
 
   await app.listen(port);
@@ -59,10 +63,13 @@ async function bootstrap(): Promise<void> {
 
 bootstrap().catch((error: unknown) => {
   const logger = new Logger('Bootstrap');
+
   if (error instanceof Error) {
     logger.error(`Application bootstrap failed: ${error.message}`, error.stack);
   } else {
     logger.error('Application bootstrap failed', String(error));
   }
+
+  // شکست راه‌اندازی باید برای مدیر فرایند یا کانتینر قابل تشخیص باشد.
   process.exit(1);
 });
