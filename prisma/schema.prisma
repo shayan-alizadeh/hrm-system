@@ -7,6 +7,10 @@ datasource db {
   provider = "mysql"
 }
 
+// -----------------------------------------------------------------------------
+// کاربران و ساختار سازمانی
+// -----------------------------------------------------------------------------
+
 enum RoleType {
   MANAGER
   EMPLOYEE
@@ -38,7 +42,9 @@ model User {
   role RoleType @default(EMPLOYEE)
 
   departmentId Int?
-  department   Department? @relation(fields: [departmentId], references: [id])
+
+  // انتقال یا خارج کردن کاربران از دپارتمان باید پیش از حذف آن انجام شود.
+  department Department? @relation(fields: [departmentId],references: [id],onDelete: Restrict)
 
   refreshTokens RefreshToken[]
   attendances   Attendance[]
@@ -47,9 +53,17 @@ model User {
   leaveRequests LeaveRequest[]
   contracts     Contract[]
 
-  // mobile و nationalCode به‌واسطه @unique دارای ایندکس هستند.
+  // شمارش و دریافت اعضای دپارتمان.
+  // هنگام migration، ایندکس خودکار موجود برای FK نیز بررسی شود.
+  @@index([departmentId], map: "idx_users_department")
+
+  // mobile و nationalCode از طریق @unique ایندکس دارند.
   @@map("users")
 }
+
+// -----------------------------------------------------------------------------
+// نشست‌های احراز هویت
+// -----------------------------------------------------------------------------
 
 model RefreshToken {
   id        String @id @default(uuid()) @db.VarChar(36)
@@ -61,16 +75,22 @@ model RefreshToken {
   createdAt DateTime  @default(now())
   revokedAt DateTime?
 
-  // پوشش جست‌وجوی نشست‌های کاربر و شرط revokedAt: null.
-  // ستون ابتدایی، جست‌وجوی صرفاً بر اساس userId را نیز پوشش می‌دهد.
+  // ابطال نشست‌های فعال کاربر و جست‌وجوی تمام نشست‌های همان کاربر.
   @@index([userId, revokedAt], map: "idx_refresh_tokens_user_revoked")
+
   @@map("refresh_tokens")
 }
 
+// -----------------------------------------------------------------------------
+// حضور و غیاب
+// -----------------------------------------------------------------------------
+
 model Attendance {
-  id     Int  @id @default(autoincrement())
+  id     Int @id @default(autoincrement())
   userId Int
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // حذف کاربر نباید سوابق حضور و غیاب را حذف کند.
+  user User @relation(fields: [userId],references: [id],onDelete: Restrict)
 
   // تاریخ شمسی با قالب ثابت YYYY/MM/DD و ارقام انگلیسی.
   attendanceDate String    @db.VarChar(10)
@@ -81,11 +101,20 @@ model Attendance {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // جست‌وجوی حضور یک کاربر در روز یا بازه تاریخی.
-  // این ایندکس غیر یکتا است و چند نوبت حضور در یک روز را ممنوع نمی‌کند.
+  // گزارش روزانه یا بازه تاریخی یک کارمند.
+  // غیر یکتا است؛ چند نوبت ورود و خروج در یک روز مجاز باقی می‌ماند.
   @@index([userId, attendanceDate], map: "idx_attendances_user_date")
+
+  // جست‌وجوی تردد باز با شرط checkOutTime: null.
+  // این ایندکس به‌تنهایی یکتایی تردد باز را تضمین نمی‌کند.
+  @@index([userId, checkOutTime], map: "idx_attendances_user_checkout")
+
   @@map("attendances")
 }
+
+// -----------------------------------------------------------------------------
+// حقوق و دستمزد
+// -----------------------------------------------------------------------------
 
 enum PayrollStatus {
   PENDING
@@ -93,13 +122,17 @@ enum PayrollStatus {
 }
 
 model Payroll {
-  id     Int  @id @default(autoincrement())
+  id     Int @id @default(autoincrement())
   userId Int
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // حذف کاربر دارای فیش حقوقی باید مسدود شود.
+  user User @relation(fields: [userId],references: [id],onDelete: Restrict)
 
   year  Int
   month Int
 
+  // نوع Float فعلاً برای سازگاری با سرویس‌های فعلی حفظ شده است.
+  // مهاجرت مالی به Decimal باید همراه با اصلاح محاسبات و خروجی API باشد.
   baseSalary      Float
   totalAllowances Float
   grossSalary     Float
@@ -116,8 +149,10 @@ model Payroll {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // علاوه بر جلوگیری از فیش تکراری، جست‌وجوی کاربر و سال را پوشش می‌دهد.
+  // هر کارمند در یک سال و ماه، حداکثر یک فیش دارد.
+  // ترتیب فیلدها جست‌وجوی userId و userId + year را نیز پوشش می‌دهد.
   @@unique([userId, year, month])
+
   @@map("payrolls")
 }
 
@@ -131,11 +166,16 @@ model TaxRule {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // دریافت پله‌های یک سال به ترتیب حداقل درآمد.
-  // جلوگیری از هم‌پوشانی پله‌ها به اعتبارسنجی جداگانه نیاز دارد.
+  // دریافت پله‌های یک سال به ترتیب کف درآمد.
+  // عدم هم‌پوشانی پله‌ها همچنان در تراکنش سرویس بررسی می‌شود.
   @@index([year, minIncome], map: "idx_tax_rules_year_min_income")
+
   @@map("tax_rules")
 }
+
+// -----------------------------------------------------------------------------
+// مرخصی
+// -----------------------------------------------------------------------------
 
 enum LeaveType {
   ANNUAL
@@ -155,30 +195,35 @@ enum LeaveStatus {
 model LeaveBalance {
   id     Int @id @default(autoincrement())
   userId Int
-  user   User @relation(fields: [userId],references: [id],onDelete: Cascade,map: "fk_leave_balance_user")
 
-  year           Int
-  totalDays      Float @default(26)
-  usedDays       Float @default(0)
-  usedSickDays   Float @default(0)
+  user User @relation(fields: [userId],references: [id],onDelete: Restrict,map: "fk_leave_balance_user")
+
+  year Int
+
+  // سهمیه پیش‌فرض فعلی برنامه؛ بیانگر قاعده حقوقی عمومی نیست.
+  totalDays     Float @default(26)
+  usedDays      Float @default(0)
+  usedSickDays  Float @default(0)
   usedUnpaidDays Float @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // ایندکس یکتا برای دریافت موجودی سالانه هر کاربر کافی است.
+  // برای هر کارمند در هر سال، یک موجودی ثبت می‌شود.
   @@unique([userId, year])
+
   @@map("leave_balances")
 }
 
 model LeaveRequest {
-  id     Int  @id @default(autoincrement())
+  id     Int @id @default(autoincrement())
   userId Int
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId],references: [id],onDelete: Restrict)
 
   leaveType LeaveType
 
-  // تاریخ‌های شمسی با قالب ثابت YYYY/MM/DD و ارقام انگلیسی.
+  // مقایسه رشته‌ای فقط با قالب ثابت و تاریخ معتبر قابل اتکاست.
   startDate String @db.VarChar(10)
   endDate   String @db.VarChar(10)
 
@@ -193,10 +238,15 @@ model LeaveRequest {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // سوابق کاربر و محدودکردن جست‌وجو بر اساس تاریخ شروع.
+  // فیلتر تاریخ برای یک کارمند بدون الزام به تعیین وضعیت.
   @@index([userId, startDate], map: "idx_leave_requests_user_start")
 
-  // فهرست مدیریتی با وضعیت مشخص، مرتب‌شده بر اساس تاریخ شروع.
+  // بررسی درخواست‌های در انتظار یا تأییدشده کارمند و محدود کردن بازه.
+  // شرط endDate ممکن است پس از پیمایش ایندکس ارزیابی شود.
+  @@index([userId, status, startDate],map: "idx_leave_requests_user_status_start")
+
+  // فیلتر مدیریتی بر اساس وضعیت و تاریخ شروع.
+  // این ایندکس مرتب‌سازی createdAt را تضمین نمی‌کند.
   @@index([status, startDate], map: "idx_leave_requests_status_start")
 
   @@map("leave_requests")
@@ -210,9 +260,13 @@ model Holiday {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // date به‌واسطه @unique دارای ایندکس است.
+  // قید یکتای date برای جست‌وجوی تاریخ و بازه تاریخی نیز قابل استفاده است.
   @@map("holidays")
 }
+
+// -----------------------------------------------------------------------------
+// قراردادها
+// -----------------------------------------------------------------------------
 
 enum ContractType {
   FULL_TIME
@@ -228,32 +282,36 @@ enum ContractStatus {
 }
 
 model Contract {
-  id     Int  @id @default(autoincrement())
+  id     Int @id @default(autoincrement())
   userId Int
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId],references: [id],onDelete: Restrict)
 
   contractNo String         @unique @db.VarChar(50)
   jobTitle   String         @db.VarChar(100)
   type       ContractType
   status     ContractStatus @default(ACTIVE)
 
-  // تاریخ‌های شمسی با قالب ثابت YYYY/MM/DD و ارقام انگلیسی.
   startDate String @db.VarChar(10)
   endDate   String @db.VarChar(10)
 
+  // واحد قراردادی API فعلی: ریال.
+  // داده‌های قدیمی باید جداگانه از نظر واحد پول بررسی شوند.
   baseSalary       Float
   housingAllowance Float @default(0)
   foodAllowance    Float @default(0)
   childAllowance   Float @default(0)
 
   insuranceNo String? @db.VarChar(20)
-  fileUrl     String?
+  fileUrl     String? @db.VarChar(191)
   notes       String? @db.Text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // قراردادهای یک کاربر با وضعیت مشخص و فیلتر یا ترتیب تاریخ شروع.
-  @@index([userId, status, startDate], map: "idx_contracts_user_status_start")
+  // قراردادهای کارمند با وضعیت مشخص و شرط تاریخ شروع.
+  // این ایندکس قید «فقط یک قرارداد فعال» نیست.
+  @@index([userId, status, startDate],map: "idx_contracts_user_status_start")
+
   @@map("contracts")
 }

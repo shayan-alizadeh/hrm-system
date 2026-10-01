@@ -3,8 +3,7 @@ import {
   ConflictException,
   NotFoundException,
 } from '@nestjs/common';
-import { isValidJalaaliDate, jalaaliMonthLength } from 'jalaali-js';
-
+import jalaali from 'jalaali-js';
 import { Prisma } from '../../../../generated/prisma/client.js';
 import { PrismaService } from '../../../prisma/prisma.service.js';
 
@@ -13,6 +12,8 @@ export interface TaxBand {
   maxIncome: number | null;
   percentage: number;
 }
+
+const { isValidJalaaliDate, jalaaliMonthLength } = jalaali;
 
 /**
  * خطاهای شناخته‌شده Prisma را بدون وابستگی به متن پیام بررسی می‌کند.

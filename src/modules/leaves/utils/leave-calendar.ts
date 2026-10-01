@@ -1,12 +1,13 @@
 import { BadRequestException } from '@nestjs/common';
-import { d2g, d2j, isValidJalaaliDate, j2d } from 'jalaali-js';
-
+import jalaali from 'jalaali-js';
 import type { Prisma } from '../../../../generated/prisma/client.js';
 
 export interface LeaveDayCalculation {
   totalDays: number;
   daysByYear: Map<number, number>;
 }
+
+const { d2g, d2j, isValidJalaaliDate, j2d } = jalaali;
 
 /**
  * قالب ثابت برای مقایسه رشته‌ای تاریخ‌ها در دیتابیس الزامی است.

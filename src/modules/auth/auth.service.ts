@@ -21,7 +21,7 @@ import type { User } from '../../../generated/prisma/client.js';
 import type { RoleType } from '../../../generated/prisma/enums.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 
-interface TokenPair {
+export interface TokenPair {
   accessToken: string;
   refreshToken: string;
 }

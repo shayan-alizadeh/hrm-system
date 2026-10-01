@@ -1,96 +1,197 @@
+import { Transform } from 'class-transformer';
 import {
-  IsNotEmpty,
-  IsString,
+  IsDefined,
   IsEnum,
-  Matches,
+  IsInt,
+  IsNotEmpty,
   IsNumber,
-  Min,
   IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+  ValidateIf,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ContractType } from '../../../../generated/prisma/enums.js'; 
 
+import { ContractType } from '../../../../generated/prisma/enums.js';
+import { IsJalaliDate } from '../../../common/validators/is-jalali-date.validator.js';
+
+/**
+ * ورودی ثبت قرارداد.
+ * مقادیر مالی باید به صورت عدد واقعی در بدنه JSON ارسال شوند.
+ */
 export class CreateContractDto {
-  @ApiProperty({ description: 'شناسه کارمند', example: 5 })
-  @IsNumber()
-  @Min(1)
-  @IsNotEmpty({ message: 'شناسه کاربر الزامی است' })
+  @ApiProperty({
+    description: 'شناسه کارمند',
+    example: 5,
+    type: 'integer',
+    minimum: 1,
+    maximum: 2_147_483_647,
+  })
+  @IsDefined({ message: 'شناسه کارمند الزامی است.' })
+  @IsInt({ message: 'شناسه کارمند باید عدد صحیح باشد.' })
+  @Min(1, { message: 'شناسه کارمند باید بزرگ‌تر از صفر باشد.' })
+  @Max(2_147_483_647, {
+    message: 'شناسه کارمند خارج از محدوده مجاز است.',
+  })
   userId!: number;
 
-  @ApiProperty({ description: 'شماره یکتای قرارداد', example: 'CNT-1404-0012' })
-  @IsString()
-  @IsNotEmpty({ message: 'شماره قرارداد الزامی است' })
+  @ApiProperty({
+    description: 'شماره یکتای قرارداد',
+    example: 'CNT-1404-0012',
+    maxLength: 50,
+  })
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @IsDefined({ message: 'شماره قرارداد الزامی است.' })
+  @IsString({ message: 'شماره قرارداد باید متن باشد.' })
+  @IsNotEmpty({ message: 'شماره قرارداد نمی‌تواند خالی باشد.' })
+  @MaxLength(50, {
+    message: 'شماره قرارداد نمی‌تواند بیشتر از ۵۰ کاراکتر باشد.',
+  })
   contractNo!: string;
 
   @ApiProperty({
     description: 'عنوان شغلی',
     example: 'Senior Backend Developer',
+    maxLength: 100,
   })
-  @IsString()
-  @IsNotEmpty({ message: 'عنوان شغلی الزامی است' })
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @IsDefined({ message: 'عنوان شغلی الزامی است.' })
+  @IsString({ message: 'عنوان شغلی باید متن باشد.' })
+  @IsNotEmpty({ message: 'عنوان شغلی نمی‌تواند خالی باشد.' })
+  @MaxLength(100, {
+    message: 'عنوان شغلی نمی‌تواند بیشتر از ۱۰۰ کاراکتر باشد.',
+  })
   jobTitle!: string;
 
   @ApiProperty({
     description: 'نوع قرارداد',
     enum: ContractType,
+    enumName: 'ContractType',
     example: ContractType.FULL_TIME,
   })
-  @IsEnum(ContractType, { message: 'نوع قرارداد نامعتبر است' })
-  @IsNotEmpty()
+  @IsDefined({ message: 'نوع قرارداد الزامی است.' })
+  @IsEnum(ContractType, { message: 'نوع قرارداد نامعتبر است.' })
   type!: ContractType;
 
   @ApiProperty({
-    description: 'تاریخ شروع (YYYY/MM/DD)',
+    description: 'تاریخ شمسی شروع قرارداد با قالب yyyy/mm/dd',
     example: '1404/01/01',
+    type: String,
+    minLength: 10,
+    maxLength: 10,
   })
-  @IsString()
-  @Matches(/^(13|14)\d{2}\/(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])$/)
-  @IsNotEmpty()
+  @IsDefined({ message: 'تاریخ شروع الزامی است.' })
+  @IsString({ message: 'تاریخ شروع باید رشته متنی باشد.' })
+  @IsJalaliDate({ message: 'تاریخ شروع شمسی معتبر نیست.' })
   startDate!: string;
 
   @ApiProperty({
-    description: 'تاریخ پایان (YYYY/MM/DD)',
+    description: 'تاریخ شمسی پایان قرارداد با قالب yyyy/mm/dd',
     example: '1404/12/29',
+    type: String,
+    minLength: 10,
+    maxLength: 10,
   })
-  @IsString()
-  @Matches(/^(13|14)\d{2}\/(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])$/)
-  @IsNotEmpty()
+  @IsDefined({ message: 'تاریخ پایان الزامی است.' })
+  @IsString({ message: 'تاریخ پایان باید رشته متنی باشد.' })
+  @IsJalaliDate({ message: 'تاریخ پایان شمسی معتبر نیست.' })
   endDate!: string;
 
-  @ApiProperty({ description: 'حقوق پایه (تومان/ریال)', example: 15000000 })
-  @IsNumber()
-  @Min(0)
-  @IsNotEmpty()
+  @ApiProperty({
+    description: 'حقوق پایه به ریال',
+    example: 150_000_000,
+    minimum: 0,
+    maximum: Number.MAX_SAFE_INTEGER,
+  })
+  @IsDefined({ message: 'حقوق پایه الزامی است.' })
+  @IsNumber(
+    { allowNaN: false, allowInfinity: false },
+    { message: 'حقوق پایه باید عدد معتبر باشد.' },
+  )
+  @Min(0, { message: 'حقوق پایه نمی‌تواند منفی باشد.' })
+  @Max(Number.MAX_SAFE_INTEGER, {
+    message: 'حقوق پایه خارج از محدوده مجاز است.',
+  })
   baseSalary!: number;
 
-  @ApiPropertyOptional({ description: 'حق مسکن', example: 900000 })
-  @IsNumber()
-  @Min(0)
-  @IsOptional()
+  @ApiPropertyOptional({
+    description: 'حق مسکن به ریال؛ در زمان ایجاد، مقدار پیش‌فرض صفر است.',
+    example: 9_000_000,
+    minimum: 0,
+    maximum: Number.MAX_SAFE_INTEGER,
+  })
+  // فقط نبود فیلد مجاز است؛ null باید توسط اعتبارسنجی رد شود.
+  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @IsNumber(
+    { allowNaN: false, allowInfinity: false },
+    { message: 'حق مسکن باید عدد معتبر باشد.' },
+  )
+  @Min(0, { message: 'حق مسکن نمی‌تواند منفی باشد.' })
+  @Max(Number.MAX_SAFE_INTEGER, {
+    message: 'حق مسکن خارج از محدوده مجاز است.',
+  })
   housingAllowance?: number;
 
-  @ApiPropertyOptional({ description: 'حق بن کارگری', example: 1400000 })
-  @IsNumber()
-  @Min(0)
-  @IsOptional()
+  @ApiPropertyOptional({
+    description: 'بن کارگری به ریال؛ در زمان ایجاد، مقدار پیش‌فرض صفر است.',
+    example: 14_000_000,
+    minimum: 0,
+    maximum: Number.MAX_SAFE_INTEGER,
+  })
+  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @IsNumber(
+    { allowNaN: false, allowInfinity: false },
+    { message: 'بن کارگری باید عدد معتبر باشد.' },
+  )
+  @Min(0, { message: 'بن کارگری نمی‌تواند منفی باشد.' })
+  @Max(Number.MAX_SAFE_INTEGER, {
+    message: 'بن کارگری خارج از محدوده مجاز است.',
+  })
   foodAllowance?: number;
 
-  @ApiPropertyOptional({ description: 'حق اولاد', example: 700000 })
-  @IsNumber()
-  @Min(0)
-  @IsOptional()
+  @ApiPropertyOptional({
+    description: 'حق اولاد به ریال؛ در زمان ایجاد، مقدار پیش‌فرض صفر است.',
+    example: 7_000_000,
+    minimum: 0,
+    maximum: Number.MAX_SAFE_INTEGER,
+  })
+  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @IsNumber(
+    { allowNaN: false, allowInfinity: false },
+    { message: 'حق اولاد باید عدد معتبر باشد.' },
+  )
+  @Min(0, { message: 'حق اولاد نمی‌تواند منفی باشد.' })
+  @Max(Number.MAX_SAFE_INTEGER, {
+    message: 'حق اولاد خارج از محدوده مجاز است.',
+  })
   childAllowance?: number;
 
   @ApiPropertyOptional({
-    description: 'شماره بیمه تامین اجتماعی',
+    description: 'شماره بیمه؛ ارسال null مجاز است.',
     example: '1234567890',
+    type: String,
+    nullable: true,
+    maxLength: 20,
   })
-  @IsString()
   @IsOptional()
-  insuranceNo?: string;
+  @IsString({ message: 'شماره بیمه باید متن یا null باشد.' })
+  @MaxLength(20, {
+    message: 'شماره بیمه نمی‌تواند بیشتر از ۲۰ کاراکتر باشد.',
+  })
+  insuranceNo?: string | null;
 
-  @ApiPropertyOptional({ description: 'یادداشت‌های قرارداد' })
-  @IsString()
+  @ApiPropertyOptional({
+    description: 'یادداشت قرارداد؛ ارسال null مجاز است.',
+    type: String,
+    nullable: true,
+  })
   @IsOptional()
-  notes?: string;
+  @IsString({ message: 'یادداشت باید متن یا null باشد.' })
+  notes?: string | null;
 }
