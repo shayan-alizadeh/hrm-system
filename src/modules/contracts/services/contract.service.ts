@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import jalaali from 'jalaali-js';
-import { Prisma, type Contract } from '../../../../generated/prisma/client.js';
+import { Prisma } from '../../../../generated/prisma/client.js';
 import {
   ContractStatus,
   ContractType,
@@ -14,23 +14,23 @@ import { PrismaService } from '../../../prisma/prisma.service.js';
 import { CreateContractDto } from '../dto/create-contract.dto.js';
 import { UpdateContractDto } from '../dto/update-contract.dto.js';
 
-type ContractValues = Pick<
-  Contract,
-  | 'userId'
-  | 'contractNo'
-  | 'jobTitle'
-  | 'type'
-  | 'status'
-  | 'startDate'
-  | 'endDate'
-  | 'baseSalary'
-  | 'housingAllowance'
-  | 'foodAllowance'
-  | 'childAllowance'
-  | 'insuranceNo'
-  | 'notes'
-  | 'fileUrl'
->;
+// تغییر تایپ‌ها برای پشتیبانی هم‌‌زمان از number ورودی کاربر و Decimal دیتابیس
+type ContractValues = {
+  userId: number;
+  contractNo: string;
+  jobTitle: string;
+  type: ContractType;
+  status: ContractStatus;
+  startDate: string;
+  endDate: string;
+  baseSalary: number | Prisma.Decimal;
+  housingAllowance: number | Prisma.Decimal;
+  foodAllowance: number | Prisma.Decimal;
+  childAllowance: number | Prisma.Decimal;
+  insuranceNo: string | null;
+  notes: string | null;
+  fileUrl: string | null;
+};
 
 const { isValidJalaaliDate } = jalaali;
 
@@ -120,14 +120,17 @@ export class ContractService {
       );
     }
 
-    const amounts: Array<[string, number]> = [
+    const amounts: Array<[string, number | Prisma.Decimal]> = [
       ['حقوق پایه', values.baseSalary],
       ['حق مسکن', values.housingAllowance],
       ['بن کارگری', values.foodAllowance],
       ['حق اولاد', values.childAllowance],
     ];
 
-    for (const [label, amount] of amounts) {
+    for (const [label, val] of amounts) {
+      // پشتیبانی از Decimal در زمان Update
+      const amount = val instanceof Prisma.Decimal ? val.toNumber() : val;
+
       if (
         typeof amount !== 'number' ||
         !Number.isFinite(amount) ||
@@ -168,22 +171,18 @@ export class ContractService {
           if (attempt < maxAttempts) {
             continue;
           }
-
           throw new ConflictException(
             'قراردادها هم‌زمان تغییر کرده‌اند. لطفاً دوباره تلاش کنید.',
           );
         }
-
         if (error.code === 'P2002') {
           throw new ConflictException(
             'شماره قرارداد قبلاً در سیستم ثبت شده است.',
           );
         }
-
         if (error.code === 'P2025') {
           throw new NotFoundException('قرارداد یافت نشد.');
         }
-
         if (error.code === 'P2003') {
           throw new ConflictException(
             'ثبت قرارداد به دلیل تغییر یا نبود اطلاعات کارمند ممکن نیست.',
@@ -193,7 +192,6 @@ export class ContractService {
         throw error;
       }
     }
-
     throw new ConflictException('عملیات قرارداد تکمیل نشد.');
   }
 
@@ -210,10 +208,9 @@ export class ContractService {
       startDate: dto.startDate,
       endDate: dto.endDate,
       baseSalary: dto.baseSalary,
-      housingAllowance:
-        dto.housingAllowance === undefined ? 0 : dto.housingAllowance,
-      foodAllowance: dto.foodAllowance === undefined ? 0 : dto.foodAllowance,
-      childAllowance: dto.childAllowance === undefined ? 0 : dto.childAllowance,
+      housingAllowance: dto.housingAllowance ?? 0,
+      foodAllowance: dto.foodAllowance ?? 0,
+      childAllowance: dto.childAllowance ?? 0,
       insuranceNo: dto.insuranceNo ?? null,
       notes: dto.notes ?? null,
       fileUrl: null,
@@ -288,7 +285,7 @@ export class ContractService {
         userId,
         status: ContractStatus.ACTIVE,
       },
-      take: 2,
+      take: 2, // تکنیک عالی برای شناسایی سریع Data Inconsistency
       orderBy: { id: 'asc' },
     });
 
@@ -344,30 +341,23 @@ export class ContractService {
         throw new NotFoundException('قرارداد یافت نشد.');
       }
 
+      // استفاده از Spread و Fallback برای تمیزتر شدن کد نسبت به نوشتن شرط‌های سه‌گانه تو در تو
       const data: ContractValues = {
-        userId: dto.userId === undefined ? existing.userId : dto.userId,
-        contractNo:
-          dto.contractNo === undefined ? existing.contractNo : dto.contractNo,
-        jobTitle: dto.jobTitle === undefined ? existing.jobTitle : dto.jobTitle,
-        type: dto.type === undefined ? existing.type : dto.type,
-        status: dto.status === undefined ? existing.status : dto.status,
-        startDate:
-          dto.startDate === undefined ? existing.startDate : dto.startDate,
-        endDate: dto.endDate === undefined ? existing.endDate : dto.endDate,
-        baseSalary:
-          dto.baseSalary === undefined ? existing.baseSalary : dto.baseSalary,
-        housingAllowance:
-          dto.housingAllowance === undefined
-            ? existing.housingAllowance
-            : dto.housingAllowance,
-        foodAllowance:
-          dto.foodAllowance === undefined
-            ? existing.foodAllowance
-            : dto.foodAllowance,
-        childAllowance:
-          dto.childAllowance === undefined
-            ? existing.childAllowance
-            : dto.childAllowance,
+        ...existing,
+        ...dto,
+        // مقادیری که undefined ارسال می‌شوند، با مقادیر قبلی جایگزین می‌شوند
+        userId: dto.userId ?? existing.userId,
+        contractNo: dto.contractNo ?? existing.contractNo,
+        jobTitle: dto.jobTitle ?? existing.jobTitle,
+        type: dto.type ?? existing.type,
+        status: dto.status ?? existing.status,
+        startDate: dto.startDate ?? existing.startDate,
+        endDate: dto.endDate ?? existing.endDate,
+        baseSalary: dto.baseSalary ?? existing.baseSalary,
+        housingAllowance: dto.housingAllowance ?? existing.housingAllowance,
+        foodAllowance: dto.foodAllowance ?? existing.foodAllowance,
+        childAllowance: dto.childAllowance ?? existing.childAllowance,
+        // در مورد null پذیرها اگر دقیقاً null فرستاده شد اعمال شود، وگرنه مقدار قبلی
         insuranceNo:
           dto.insuranceNo === undefined
             ? existing.insuranceNo

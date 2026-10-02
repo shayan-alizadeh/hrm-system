@@ -33,9 +33,9 @@ model User {
   id           Int     @id @default(autoincrement())
   firstName    String  @db.VarChar(50)
   lastName     String  @db.VarChar(50)
-  nationalCode String? @unique @db.VarChar(10)
+  nationalCode String? @unique @db.Char(10) // Char(10) is better for exact 10-length
   mobile       String  @unique @db.VarChar(15)
-  password     String
+  password     String  @db.VarChar(255)
   isActive     Boolean @default(true)
   tokenVersion Int     @default(1)
 
@@ -44,7 +44,7 @@ model User {
   departmentId Int?
 
   // انتقال یا خارج کردن کاربران از دپارتمان باید پیش از حذف آن انجام شود.
-  department Department? @relation(fields: [departmentId],references: [id],onDelete: Restrict)
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: Restrict, map: "fk_user_department")
 
   refreshTokens RefreshToken[]
   attendances   Attendance[]
@@ -70,7 +70,7 @@ model RefreshToken {
   tokenHash String @db.VarChar(255)
 
   userId Int
-  user   User @relation(fields: [userId],references: [id],onDelete: Cascade,map: "fk_refresh_token_user")
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade, map: "fk_refresh_token_user")
 
   createdAt DateTime  @default(now())
   revokedAt DateTime?
@@ -90,10 +90,10 @@ model Attendance {
   userId Int
 
   // حذف کاربر نباید سوابق حضور و غیاب را حذف کند.
-  user User @relation(fields: [userId],references: [id],onDelete: Restrict)
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict, map: "fk_attendance_user")
 
-  // تاریخ شمسی با قالب ثابت YYYY/MM/DD و ارقام انگلیسی.
-  attendanceDate String    @db.VarChar(10)
+  // تاریخ شمسی با قالب ثابت YYYY/MM/DD و ارقام انگلیسی. (از Char(10) استفاده شد)
+  attendanceDate String    @db.Char(10)
   checkInTime    DateTime?
   checkOutTime   DateTime?
   notes          String?   @db.VarChar(250)
@@ -126,22 +126,22 @@ model Payroll {
   userId Int
 
   // حذف کاربر دارای فیش حقوقی باید مسدود شود.
-  user User @relation(fields: [userId],references: [id],onDelete: Restrict)
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict, map: "fk_payroll_user")
 
   year  Int
   month Int
 
-  // نوع Float فعلاً برای سازگاری با سرویس‌های فعلی حفظ شده است.
-  // مهاجرت مالی به Decimal باید همراه با اصلاح محاسبات و خروجی API باشد.
-  baseSalary      Float
-  totalAllowances Float
-  grossSalary     Float
+  // تمام فیلدهای مالی به Decimal تغییر یافتند تا از باگ‌های کاهش دقت (Precision Loss) جلوگیری شود.
+  // مقادیر (15,0) برای واحد پولی ریال (بدون اعشار) در نظر گرفته شده‌اند.
+  baseSalary           Decimal @db.Decimal(15, 0)
+  totalAllowances      Decimal @db.Decimal(15, 0)
+  grossSalary          Decimal @db.Decimal(15, 0)
 
-  taxDeduction         Float
-  insuranceDeduction   Float
-  unpaidLeaveDeduction Float
+  taxDeduction         Decimal @db.Decimal(15, 0)
+  insuranceDeduction   Decimal @db.Decimal(15, 0)
+  unpaidLeaveDeduction Decimal @db.Decimal(15, 0)
 
-  netSalary Float
+  netSalary Decimal @db.Decimal(15, 0)
 
   status      PayrollStatus @default(PENDING)
   paymentDate DateTime?
@@ -157,11 +157,11 @@ model Payroll {
 }
 
 model TaxRule {
-  id         Int    @id @default(autoincrement())
+  id         Int      @id @default(autoincrement())
   year       Int
-  minIncome  Float
-  maxIncome  Float?
-  percentage Float
+  minIncome  Decimal  @db.Decimal(15, 0)
+  maxIncome  Decimal? @db.Decimal(15, 0)
+  percentage Decimal  @db.Decimal(5, 2) // درصد مالیات (مثلاً 10.50 درصد)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -196,15 +196,15 @@ model LeaveBalance {
   id     Int @id @default(autoincrement())
   userId Int
 
-  user User @relation(fields: [userId],references: [id],onDelete: Restrict,map: "fk_leave_balance_user")
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict, map: "fk_leave_balance_user")
 
   year Int
 
-  // سهمیه پیش‌فرض فعلی برنامه؛ بیانگر قاعده حقوقی عمومی نیست.
-  totalDays     Float @default(26)
-  usedDays      Float @default(0)
-  usedSickDays  Float @default(0)
-  usedUnpaidDays Float @default(0)
+  // مقادیر روزهای مرخصی به Decimal(5,2) تغییر یافتند تا محاسبات دقیق اعشاری (مثل 0.5 روز) دچار باگ Float نشوند.
+  totalDays      Decimal @default(26) @db.Decimal(5, 2)
+  usedDays       Decimal @default(0)  @db.Decimal(5, 2)
+  usedSickDays   Decimal @default(0)  @db.Decimal(5, 2)
+  usedUnpaidDays Decimal @default(0)  @db.Decimal(5, 2)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -219,15 +219,15 @@ model LeaveRequest {
   id     Int @id @default(autoincrement())
   userId Int
 
-  user User @relation(fields: [userId],references: [id],onDelete: Restrict)
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict, map: "fk_leave_request_user")
 
   leaveType LeaveType
 
   // مقایسه رشته‌ای فقط با قالب ثابت و تاریخ معتبر قابل اتکاست.
-  startDate String @db.VarChar(10)
-  endDate   String @db.VarChar(10)
+  startDate String @db.Char(10)
+  endDate   String @db.Char(10)
 
-  totalDays Float
+  totalDays Decimal @db.Decimal(5, 2)
 
   reason String      @db.Text
   status LeaveStatus @default(PENDING)
@@ -243,7 +243,7 @@ model LeaveRequest {
 
   // بررسی درخواست‌های در انتظار یا تأییدشده کارمند و محدود کردن بازه.
   // شرط endDate ممکن است پس از پیمایش ایندکس ارزیابی شود.
-  @@index([userId, status, startDate],map: "idx_leave_requests_user_status_start")
+  @@index([userId, status, startDate], map: "idx_leave_requests_user_status_start")
 
   // فیلتر مدیریتی بر اساس وضعیت و تاریخ شروع.
   // این ایندکس مرتب‌سازی createdAt را تضمین نمی‌کند.
@@ -254,7 +254,7 @@ model LeaveRequest {
 
 model Holiday {
   id    Int    @id @default(autoincrement())
-  date  String @unique @db.VarChar(10)
+  date  String @unique @db.Char(10)
   title String @db.VarChar(100)
 
   createdAt DateTime @default(now())
@@ -285,22 +285,21 @@ model Contract {
   id     Int @id @default(autoincrement())
   userId Int
 
-  user User @relation(fields: [userId],references: [id],onDelete: Restrict)
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict, map: "fk_contract_user")
 
   contractNo String         @unique @db.VarChar(50)
   jobTitle   String         @db.VarChar(100)
   type       ContractType
   status     ContractStatus @default(ACTIVE)
 
-  startDate String @db.VarChar(10)
-  endDate   String @db.VarChar(10)
+  startDate String @db.Char(10)
+  endDate   String @db.Char(10)
 
-  // واحد قراردادی API فعلی: ریال.
-  // داده‌های قدیمی باید جداگانه از نظر واحد پول بررسی شوند.
-  baseSalary       Float
-  housingAllowance Float @default(0)
-  foodAllowance    Float @default(0)
-  childAllowance   Float @default(0)
+  // واحد قراردادی API فعلی: ریال. (تبدیل به Decimal برای حفظ امنیت مالی)
+  baseSalary       Decimal @db.Decimal(15, 0)
+  housingAllowance Decimal @default(0) @db.Decimal(15, 0)
+  foodAllowance    Decimal @default(0) @db.Decimal(15, 0)
+  childAllowance   Decimal @default(0) @db.Decimal(15, 0)
 
   insuranceNo String? @db.VarChar(20)
   fileUrl     String? @db.VarChar(191)
@@ -311,7 +310,7 @@ model Contract {
 
   // قراردادهای کارمند با وضعیت مشخص و شرط تاریخ شروع.
   // این ایندکس قید «فقط یک قرارداد فعال» نیست.
-  @@index([userId, status, startDate],map: "idx_contracts_user_status_start")
+  @@index([userId, status, startDate], map: "idx_contracts_user_status_start")
 
   @@map("contracts")
 }
