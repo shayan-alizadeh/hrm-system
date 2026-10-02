@@ -36,7 +36,6 @@ export class PayrollCalculatorService {
       );
     }
 
-    // داده‌های قدیمی نیز ممکن است پیش از اضافه شدن اعتبارسنجی ثبت شده باشند.
     assertValidTaxBands(rules);
 
     let totalTax = new Prisma.Decimal(0);

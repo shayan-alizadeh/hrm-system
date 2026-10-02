@@ -5,7 +5,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { PayrollStatus } from '../../../../generated/prisma/enums.js';
 
 /**
- * فقط نمایش ده‌دهی یک عدد صحیح نامنفی را تبدیل می‌کند.
+ * فقط نمایش ده‌‌دهی یک عدد صحیح نامنفی را تبدیل می‌کند.
  * مقدار نامعتبر حفظ می‌شود تا اعتبارسنجی آن را رد کند.
  */
 function parseIntegerQuery(value: unknown): unknown {
@@ -44,7 +44,7 @@ export class FilterPayrollDto {
   @Transform(({ value }: { value: unknown }) => parseIntegerQuery(value))
   @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
   @IsInt({ message: 'سال باید عدد صحیح باشد.' })
-  @Min(1300, { message: 'سال نمی‌تواند کمتر از ۱۳۰۰ باشد.' })
+  @Min(1300, { message: 'سال نمی‌‌تواند کمتر از ۱۳۰۰ باشد.' })
   @Max(1499, { message: 'سال نمی‌تواند بیشتر از ۱۴۹۹ باشد.' })
   year?: number;
 

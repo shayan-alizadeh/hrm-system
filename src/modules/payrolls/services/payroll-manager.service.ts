@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
-import { Prisma } from '../../../../generated/prisma/client.js';
+import { Prisma, type Payroll } from '../../../../generated/prisma/client.js';
 import {
   ContractStatus,
   LeaveStatus,
@@ -34,9 +34,21 @@ export class PayrollManagerService {
   ) {}
 
   /**
-   * صدور فیش برای یک ماه کامل.
-   * موارد نیازمند تسهیم قرارداد یا مرخصی، تا تعیین قاعده دقیق رد می‌شوند.
+   * تبدیل امن مبالغ Decimal به Number پیش از ارسال به کلاینت
    */
+  private mapPayroll(payroll: Payroll) {
+    return {
+      ...payroll,
+      baseSalary: Number(payroll.baseSalary),
+      totalAllowances: Number(payroll.totalAllowances),
+      grossSalary: Number(payroll.grossSalary),
+      taxDeduction: Number(payroll.taxDeduction),
+      insuranceDeduction: Number(payroll.insuranceDeduction),
+      unpaidLeaveDeduction: Number(payroll.unpaidLeaveDeduction),
+      netSalary: Number(payroll.netSalary),
+    };
+  }
+
   async create(dto: CreatePayrollDto) {
     const period = getPayrollPeriod(dto.year, dto.month);
 
@@ -49,7 +61,7 @@ export class PayrollManagerService {
     }
 
     try {
-      return await runSerializable(this.prisma, async (tx) => {
+      const createdPayroll = await runSerializable(this.prisma, async (tx) => {
         const existing = await tx.payroll.findUnique({
           where: {
             userId_year_month: {
@@ -181,17 +193,26 @@ export class PayrollManagerService {
           .times(unpaidDays)
           .dividedBy(period.daysInMonth);
 
-        // مبنای بیمه و مالیات نسخه قبلی حفظ شده است.
+        // --- اصلاح باگ مالیاتی و بیمه ---
+        // مبلغ کسر کار باید از مبنای بیمه و مالیات کسر شود تا کارمند هزینه ایام کار نکرده را نپردازد
+        const insuranceSubjectAmount = baseSalary
+          .plus(housing)
+          .plus(food)
+          .minus(unpaidLeaveDeduction);
         const insuranceDeduction = this.calculatorService.calculateInsurance(
-          baseSalary.plus(housing).plus(food),
+          Prisma.Decimal.max(0, insuranceSubjectAmount),
         );
 
-        const taxableIncome = grossSalary.minus(insuranceDeduction);
+        const taxableIncome = grossSalary
+          .minus(unpaidLeaveDeduction)
+          .minus(insuranceDeduction);
+
         const taxDeduction = await this.calculatorService.calculateTax(
-          taxableIncome,
+          Prisma.Decimal.max(0, taxableIncome),
           dto.year,
           tx,
         );
+        // ---------------------------------
 
         const netSalary = grossSalary
           .minus(unpaidLeaveDeduction)
@@ -220,20 +241,20 @@ export class PayrollManagerService {
           },
         });
       });
+
+      return this.mapPayroll(createdPayroll);
     } catch (error: unknown) {
-      // قید یکتای دیتابیس، آخرین لایه جلوگیری از صدور تکراری است.
       if (isPrismaError(error, 'P2002')) {
         throw new ConflictException(
           'فیش حقوقی این کاربر برای ماه انتخاب‌شده قبلاً صادر شده است.',
         );
       }
-
       throw error;
     }
   }
 
   async findAll(filters: FilterPayrollDto) {
-    return this.prisma.payroll.findMany({
+    const payrolls = await this.prisma.payroll.findMany({
       where: {
         ...(filters.userId !== undefined && { userId: filters.userId }),
         ...(filters.year !== undefined && { year: filters.year }),
@@ -247,6 +268,8 @@ export class PayrollManagerService {
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     });
+
+    return payrolls.map((p) => this.mapPayroll(p));
   }
 
   async findOne(id: number) {
@@ -263,7 +286,7 @@ export class PayrollManagerService {
       throw new NotFoundException('فیش حقوقی یافت نشد.');
     }
 
-    return payroll;
+    return this.mapPayroll(payroll);
   }
 
   async remove(id: number): Promise<void> {
@@ -274,16 +297,12 @@ export class PayrollManagerService {
     }
   }
 
-  /**
-   * بررسی وضعیت قبلی و ثبت وضعیت جدید باید اتمیک باشد.
-   * بازگشت PAID به PENDING مطابق رفتار قبلی مجاز باقی مانده است.
-   */
   async changeStatus(id: number, status: PayrollStatus) {
     if (status !== PayrollStatus.PENDING && status !== PayrollStatus.PAID) {
       throw new BadRequestException('وضعیت فیش حقوقی نامعتبر است.');
     }
 
-    return runSerializable(this.prisma, async (tx) => {
+    const updatedPayroll = await runSerializable(this.prisma, async (tx) => {
       const payroll = await tx.payroll.findUnique({
         where: { id },
       });
@@ -302,10 +321,11 @@ export class PayrollManagerService {
         where: { id },
         data: {
           status,
-          // این زمان، زمان ثبت وضعیت پرداخت در سامانه است.
           paymentDate: status === PayrollStatus.PAID ? new Date() : null,
         },
       });
     });
+
+    return this.mapPayroll(updatedPayroll);
   }
 }

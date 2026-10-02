@@ -7,10 +7,11 @@ import jalaali from 'jalaali-js';
 import { Prisma } from '../../../../generated/prisma/client.js';
 import { PrismaService } from '../../../prisma/prisma.service.js';
 
+// پشتیبانی صریح از Prisma.Decimal برای سازگاری با دیتای دریافتی از دیتابیس
 export interface TaxBand {
-  minIncome: number;
-  maxIncome: number | null;
-  percentage: number;
+  minIncome: number | Prisma.Decimal;
+  maxIncome: number | Prisma.Decimal | null;
+  percentage: number | Prisma.Decimal;
 }
 
 const { isValidJalaaliDate, jalaaliMonthLength } = jalaali;
@@ -109,7 +110,7 @@ export function assertJalaliDate(value: string): void {
 }
 
 /**
- * Decimal برای محاسبات میانی استفاده می‌شود؛ نوع ستون‌های فعلی تغییر نمی‌کند.
+ * Decimal برای محاسبات میانی استفاده می‌شود.
  */
 export function nonNegativeDecimal(
   value: number | Prisma.Decimal,
@@ -129,8 +130,7 @@ export function nonNegativeDecimal(
 }
 
 /**
- * سازگاری با ستون‌های Float و پاسخ عددی API فعلی.
- * این تبدیل، جایگزین مهاجرت ستون‌های مالی به Decimal نیست.
+ * تبدیل نهایی آبجکت دسیما به عدد صحیح برای محاسبات ریاضی پایه
  */
 export function toStoredNumber(value: Prisma.Decimal): number {
   if (!value.isFinite() || value.abs().greaterThan(Number.MAX_SAFE_INTEGER)) {
@@ -149,29 +149,40 @@ export function assertValidTaxBands(bands: readonly TaxBand[]): void {
     nonNegativeDecimal(band.minIncome, 'کف درآمد');
 
     if (band.maxIncome !== null) {
+      const min = new Prisma.Decimal(band.minIncome);
+      const max = new Prisma.Decimal(band.maxIncome);
+
       nonNegativeDecimal(band.maxIncome, 'سقف درآمد');
 
-      if (band.maxIncome <= band.minIncome) {
+      if (max.lessThanOrEqualTo(min)) {
         throw new BadRequestException('سقف درآمد باید از کف درآمد بیشتر باشد.');
       }
     }
 
-    if (
-      !Number.isFinite(band.percentage) ||
-      band.percentage < 0 ||
-      band.percentage > 100
-    ) {
+    const percentage = new Prisma.Decimal(band.percentage).toNumber();
+    if (!Number.isFinite(percentage) || percentage < 0 || percentage > 100) {
       throw new BadRequestException('درصد مالیات باید عددی بین صفر و صد باشد.');
     }
   }
 
-  const sorted = [...bands].sort((a, b) => a.minIncome - b.minIncome);
+  // اصلاح باگ سورتینگ: تبدیل امن فیلدها به عدد برای مقایسه جاوااسکریپتی
+  const sorted = [...bands].sort((a, b) => {
+    const minA = new Prisma.Decimal(a.minIncome).toNumber();
+    const minB = new Prisma.Decimal(b.minIncome).toNumber();
+    return minA - minB;
+  });
 
   for (let index = 1; index < sorted.length; index += 1) {
     const previous = sorted[index - 1];
     const current = sorted[index];
 
-    if (previous.maxIncome === null || current.minIncome < previous.maxIncome) {
+    const prevMax =
+      previous.maxIncome !== null
+        ? new Prisma.Decimal(previous.maxIncome).toNumber()
+        : null;
+    const currMin = new Prisma.Decimal(current.minIncome).toNumber();
+
+    if (prevMax === null || currMin < prevMax) {
       throw new BadRequestException(
         'پله‌های مالیاتی یک سال نباید هم‌پوشانی داشته باشند.',
       );

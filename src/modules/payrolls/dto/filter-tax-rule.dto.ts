@@ -18,7 +18,8 @@ export class FilterTaxRuleDto {
 
     return value;
   })
-  @ValidateIf((_object, value: unknown) => value !== undefined)
+  // اصلاح نوع _object به unknown برای جلوگیری از خطای Implicit Any تایپ‌اسکریپت
+  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
   @IsInt({ message: 'سال باید یک عدد صحیح باشد.' })
   @Min(1300, { message: 'سال نمی‌تواند کمتر از ۱۳۰۰ باشد.' })
   @Max(1499, { message: 'سال نمی‌تواند بیشتر از ۱۴۹۹ باشد.' })

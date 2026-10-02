@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
+import { Prisma, type TaxRule } from '../../../../generated/prisma/client.js';
 import { PrismaService } from '../../../prisma/prisma.service.js';
 import { CreateTaxRuleDto } from '../dto/create-tax-rule.dto.js';
 import { UpdateTaxRuleDto } from '../dto/update-tax-rule.dto.js';
@@ -19,6 +20,18 @@ export class TaxRuleService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
+   * تبدیل امن مبالغ Decimal به Number پیش از ارسال به API
+   */
+  private mapTaxRule(rule: TaxRule) {
+    return {
+      ...rule,
+      minIncome: Number(rule.minIncome),
+      maxIncome: rule.maxIncome !== null ? Number(rule.maxIncome) : null,
+      percentage: Number(rule.percentage), // درصد در دیتابیس هم Decimal(5,2) است
+    };
+  }
+
+  /**
    * بررسی هم‌پوشانی و درج، داخل یک تراکنش انجام می‌شوند
    * تا دو درخواست هم‌زمان نتوانند پله‌های متداخل ثبت کنند.
    */
@@ -32,7 +45,7 @@ export class TaxRuleService {
       percentage: dto.percentage,
     };
 
-    return runSerializable(this.prisma, async (tx) => {
+    const createdRule = await runSerializable(this.prisma, async (tx) => {
       const existingRules = await tx.taxRule.findMany({
         where: { year: candidate.year },
       });
@@ -41,6 +54,8 @@ export class TaxRuleService {
 
       return tx.taxRule.create({ data: candidate });
     });
+
+    return this.mapTaxRule(createdRule);
   }
 
   async findAll(year?: number) {
@@ -48,10 +63,12 @@ export class TaxRuleService {
       assertPayrollYear(year);
     }
 
-    return this.prisma.taxRule.findMany({
+    const rules = await this.prisma.taxRule.findMany({
       where: year === undefined ? {} : { year },
       orderBy: [{ year: 'desc' }, { minIncome: 'asc' }, { id: 'asc' }],
     });
+
+    return rules.map((r) => this.mapTaxRule(r));
   }
 
   async findOne(id: number) {
@@ -63,7 +80,7 @@ export class TaxRuleService {
       throw new NotFoundException('پله مالیاتی یافت نشد.');
     }
 
-    return rule;
+    return this.mapTaxRule(rule);
   }
 
   /**
@@ -81,7 +98,7 @@ export class TaxRuleService {
       );
     }
 
-    return runSerializable(this.prisma, async (tx) => {
+    const updatedRule = await runSerializable(this.prisma, async (tx) => {
       const existing = await tx.taxRule.findUnique({
         where: { id },
       });
@@ -90,13 +107,18 @@ export class TaxRuleService {
         throw new NotFoundException('پله مالیاتی یافت نشد.');
       }
 
+      // استفاده از Spread و بهینه‌سازی خوانایی
       const candidate = {
         year: dto.year ?? existing.year,
-        minIncome: dto.minIncome ?? existing.minIncome,
-        percentage: dto.percentage ?? existing.percentage,
+        minIncome: dto.minIncome ?? Number(existing.minIncome), // برای مقایسه بعدی حتماً عدد شود
+        percentage: dto.percentage ?? Number(existing.percentage),
         // null به معنی پله بدون سقف است؛ undefined یعنی عدم تغییر.
         maxIncome:
-          dto.maxIncome === undefined ? existing.maxIncome : dto.maxIncome,
+          dto.maxIncome === undefined
+            ? existing.maxIncome !== null
+              ? Number(existing.maxIncome)
+              : null
+            : dto.maxIncome,
       };
 
       assertPayrollYear(candidate.year);
@@ -115,6 +137,8 @@ export class TaxRuleService {
         data: candidate,
       });
     });
+
+    return this.mapTaxRule(updatedRule);
   }
 
   async remove(id: number): Promise<void> {
