@@ -4,7 +4,6 @@ import {
   IsEnum,
   IsInt,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsString,
   Max,
@@ -49,7 +48,7 @@ export class CreateContractDto {
   @IsString({ message: 'شماره قرارداد باید متن باشد.' })
   @IsNotEmpty({ message: 'شماره قرارداد نمی‌تواند خالی باشد.' })
   @MaxLength(50, {
-    message: 'شماره قرارداد نمی‌تواند بیشتر از ۵۰ کاراکتر باشد.',
+    message: 'شماره قرارداد نمی‌‌تواند بیشتر از ۵۰ کاراکتر باشد.',
   })
   contractNo!: string;
 
@@ -110,10 +109,8 @@ export class CreateContractDto {
     maximum: Number.MAX_SAFE_INTEGER,
   })
   @IsDefined({ message: 'حقوق پایه الزامی است.' })
-  @IsNumber(
-    { allowNaN: false, allowInfinity: false },
-    { message: 'حقوق پایه باید عدد معتبر باشد.' },
-  )
+  // استفاده از IsInt برای جلوگیری از ورود مقادیر اعشاری (Float) در JSON
+  @IsInt({ message: 'حقوق پایه باید عدد صحیح معتبر باشد.' })
   @Min(0, { message: 'حقوق پایه نمی‌تواند منفی باشد.' })
   @Max(Number.MAX_SAFE_INTEGER, {
     message: 'حقوق پایه خارج از محدوده مجاز است.',
@@ -126,12 +123,8 @@ export class CreateContractDto {
     minimum: 0,
     maximum: Number.MAX_SAFE_INTEGER,
   })
-  // فقط نبود فیلد مجاز است؛ null باید توسط اعتبارسنجی رد شود.
   @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
-  @IsNumber(
-    { allowNaN: false, allowInfinity: false },
-    { message: 'حق مسکن باید عدد معتبر باشد.' },
-  )
+  @IsInt({ message: 'حق مسکن باید عدد صحیح معتبر باشد.' })
   @Min(0, { message: 'حق مسکن نمی‌تواند منفی باشد.' })
   @Max(Number.MAX_SAFE_INTEGER, {
     message: 'حق مسکن خارج از محدوده مجاز است.',
@@ -145,10 +138,7 @@ export class CreateContractDto {
     maximum: Number.MAX_SAFE_INTEGER,
   })
   @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
-  @IsNumber(
-    { allowNaN: false, allowInfinity: false },
-    { message: 'بن کارگری باید عدد معتبر باشد.' },
-  )
+  @IsInt({ message: 'بن کارگری باید عدد صحیح معتبر باشد.' })
   @Min(0, { message: 'بن کارگری نمی‌تواند منفی باشد.' })
   @Max(Number.MAX_SAFE_INTEGER, {
     message: 'بن کارگری خارج از محدوده مجاز است.',
@@ -162,10 +152,7 @@ export class CreateContractDto {
     maximum: Number.MAX_SAFE_INTEGER,
   })
   @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
-  @IsNumber(
-    { allowNaN: false, allowInfinity: false },
-    { message: 'حق اولاد باید عدد معتبر باشد.' },
-  )
+  @IsInt({ message: 'حق اولاد باید عدد صحیح معتبر باشد.' })
   @Min(0, { message: 'حق اولاد نمی‌تواند منفی باشد.' })
   @Max(Number.MAX_SAFE_INTEGER, {
     message: 'حق اولاد خارج از محدوده مجاز است.',

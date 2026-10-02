@@ -12,11 +12,10 @@ import { CreateContractDto } from './create-contract.dto.js';
 
 /**
  * فیلد ارسال‌نشده بدون تغییر باقی می‌ماند.
- * null فقط برای insuranceNo، notes و fileUrl مجاز است.
+ * توجه: به دلیل رفتار PartialType، فیلدهای اجباری در صورت ارسال null از DTO عبور می‌کنند،
+ * اما این موضوع توسط متد validateContract در Service مدیریت می‌شود تا دیتابیس دچار خطا نشود.
  */
-export class UpdateContractDto extends PartialType(CreateContractDto, {
-  skipNullProperties: false,
-}) {
+export class UpdateContractDto extends PartialType(CreateContractDto) {
   @ApiPropertyOptional({
     description: 'وضعیت ثبت‌شده قرارداد',
     enum: ContractStatus,
