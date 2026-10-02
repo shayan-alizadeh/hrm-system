@@ -1,7 +1,7 @@
 import { Controller, Get, Param, ParseIntPipe, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Roles } from '../../auth/decorators/roles.decorator.js';
-import { RoleType } from '../../../../generated/prisma/client.js';
+import { RoleType } from '../../../../generated/prisma/enums.js';
 import { CurrentUser } from '../../../common/decorators/user.decorator.js';
 
 import { PayrollEmployeeService } from '../services/payroll-employee.service.js';
@@ -22,7 +22,7 @@ export class PayrollEmployeeController {
     @CurrentUser() user: { id: number },
     @Query() filters: FilterPayrollDto,
   ) {
-    return await this.payrollEmployeeService.findMyPayrolls(user.id, filters);
+    return  this.payrollEmployeeService.findMyPayrolls(user.id, filters);
   }
 
   @Get('my-payrolls/:id')
@@ -31,6 +31,6 @@ export class PayrollEmployeeController {
     @CurrentUser() user: { id: number },
     @Param('id', ParseIntPipe) id: number,
   ) {
-    return await this.payrollEmployeeService.findOne(id, user.id);
+    return  this.payrollEmployeeService.findOne(id, user.id);
   }
 }
