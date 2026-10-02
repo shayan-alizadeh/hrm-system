@@ -14,6 +14,7 @@ export class ResolveLeaveRequestDto {
   @IsIn([LeaveStatus.APPROVED, LeaveStatus.REJECTED], {
     message: 'مدیر فقط می‌تواند درخواست را تأیید یا رد کند.',
   })
+  // کلمه کلیدی typeof برای آبجکت‌های Prisma در تعریف Type کاملاً ضروری است
   status!: typeof LeaveStatus.APPROVED | typeof LeaveStatus.REJECTED;
 
   @ApiPropertyOptional({

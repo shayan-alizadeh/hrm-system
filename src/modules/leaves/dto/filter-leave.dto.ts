@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsEnum, IsInt, IsString, Max, Min, ValidateIf } from 'class-validator';
+import { IsEnum, IsInt, IsString, Max, Min, IsOptional } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 import { LeaveStatus, LeaveType } from '../../../../generated/prisma/enums.js';
@@ -21,7 +21,7 @@ export class FilterLeaveDto {
 
     return value;
   })
-  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @IsOptional() // جایگزین تمیزتر برای ValidateIf
   @IsInt({ message: 'شناسه کاربر باید عدد صحیح باشد.' })
   @Min(1, { message: 'شناسه کاربر باید بزرگ‌تر از صفر باشد.' })
   @Max(2_147_483_647, {
@@ -35,7 +35,7 @@ export class FilterLeaveDto {
     enum: LeaveStatus,
     enumName: 'LeaveStatus',
   })
-  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @IsOptional()
   @IsEnum(LeaveStatus, {
     message: 'وضعیت انتخاب‌شده نامعتبر است.',
   })
@@ -47,7 +47,7 @@ export class FilterLeaveDto {
     enum: LeaveType,
     enumName: 'LeaveType',
   })
-  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @IsOptional()
   @IsEnum(LeaveType, {
     message: 'نوع مرخصی انتخاب‌شده نامعتبر است.',
   })
@@ -60,7 +60,7 @@ export class FilterLeaveDto {
     minLength: 10,
     maxLength: 10,
   })
-  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @IsOptional()
   @IsString({ message: 'تاریخ شروع باید رشته متنی باشد.' })
   @IsJalaliDate({ message: 'تاریخ شروع شمسی معتبر نیست.' })
   startDate?: string;
@@ -72,7 +72,7 @@ export class FilterLeaveDto {
     minLength: 10,
     maxLength: 10,
   })
-  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @IsOptional()
   @IsString({ message: 'تاریخ پایان باید رشته متنی باشد.' })
   @IsJalaliDate({ message: 'تاریخ پایان شمسی معتبر نیست.' })
   endDate?: string;

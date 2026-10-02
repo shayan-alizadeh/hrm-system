@@ -37,12 +37,10 @@ export function buildLeaveRequestFilter(
       leaveType: filters.leaveType,
     }),
 
-    // درخواست باید در ابتدای بازه جست‌وجو هنوز تمام نشده باشد.
+    // منطق بسیار عالی برای پیدا کردن بازه‌های هم‌پوشان (Overlapping Intervals)
     ...(filters.startDate !== undefined && {
       endDate: { gte: filters.startDate },
     }),
-
-    // درخواست باید حداکثر تا انتهای بازه جست‌وجو شروع شده باشد.
     ...(filters.endDate !== undefined && {
       startDate: { lte: filters.endDate },
     }),

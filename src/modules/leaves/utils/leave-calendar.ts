@@ -51,9 +51,9 @@ export function assertLeaveYear(year: number): void {
 }
 
 export function getCurrentTehranJalaliYear(): number {
-  const formatter = new Intl.DateTimeFormat('fa-IR', {
+  // استفاده از fa-IR-u-nu-latn برای تضمین بازگشت اعداد لاتین در تمامی نسخه‌های Node.js
+  const formatter = new Intl.DateTimeFormat('fa-IR-u-nu-latn', {
     calendar: 'persian',
-    numberingSystem: 'latn',
     timeZone: 'Asia/Tehran',
     year: 'numeric',
   });
@@ -108,10 +108,11 @@ export async function calculateLeaveDays(
     const { jy, jm, jd } = d2j(dayNumber);
     const { gy, gm, gd } = d2g(dayNumber);
 
-    const dateString =
-      `${jy}/${String(jm).padStart(2, '0')}/` + String(jd).padStart(2, '0');
+    // اصلاح الصاق رشته‌ها به صورت یک Template Literal یکپارچه
+    const dateString = `${jy}/${String(jm).padStart(2, '0')}/${String(jd).padStart(2, '0')}`;
 
     // UTC فقط برای تعیین روز هفته استفاده می‌شود، نه زمان محلی تردد.
+    // روز 5 در خروجی getUTCDay() همیشه نمایانگر روز جمعه است.
     const weekDay = new Date(Date.UTC(gy, gm - 1, gd)).getUTCDay();
     const isFriday = weekDay === 5;
 
@@ -125,7 +126,7 @@ export async function calculateLeaveDays(
 
   if (totalDays === 0) {
     throw new BadRequestException(
-      'بازه انتخاب‌شده هیچ روز قابل کسر مرخصی ندارد.',
+      'بازه انتخاب‌شده هیچ روز قابل کسر مرخصی ندارد (احتمالاً تمام روزها جمعه یا تعطیل رسمی هستند).',
     );
   }
 
