@@ -1,4 +1,4 @@
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 
@@ -18,7 +18,12 @@ async function bootstrap(): Promise<void> {
   // امکان اجرای lifecycle hookهای پاک‌سازی هنگام دریافت سیگنال توقف.
   app.enableShutdownHooks();
 
-  app.setGlobalPrefix('api/v1');
+  // تنظیم Prefix و فعال‌سازی سیستم Versioning خودکار NestJS
+  app.setGlobalPrefix('api');
+  app.enableVersioning({
+    type: VersioningType.URI,
+    defaultVersion: '1',
+  });
 
   // اعتبار originها پیش از راه‌اندازی برنامه بررسی شده است.
   // با فعال بودن credentials، استفاده از wildcard مجاز نیست.
@@ -51,8 +56,6 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  // این روش ثبت برای interceptor بدون وابستگی تزریقی مناسب است.
-  app.useGlobalInterceptors(new TransformResponseInterceptor());
 
   // تصمیم درباره فعال بودن Swagger در تابع تنظیمات آن گرفته می‌شود.
   setupSwagger(app, configService);

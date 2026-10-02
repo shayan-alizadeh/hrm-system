@@ -1,16 +1,19 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { DepartmentModule } from './modules/departments/department.module.js';
-import { AuthModule } from './modules/auth/auth.module.js';
-import { PrismaModule } from './prisma/prisma.module.js';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+
+import { validateEnvironment } from './config/env.validation.js';
+import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor.js';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from './modules/auth/guards/roles.guard.js';
+
+import { PrismaModule } from './prisma/prisma.module.js';
+import { AuthModule } from './modules/auth/auth.module.js';
+import { DepartmentModule } from './modules/departments/department.module.js';
 import { AttendanceModule } from './modules/attendances/attendance.module.js';
-import {LeaveModule} from './modules/leaves/leave.module.js';
-import {PayrollModule} from './modules/payrolls/payroll.module.js';
-import {ContractModule } from './modules/contracts/contract.module.js'
-import {validateEnvironment} from './config/env.validation.js'
+import { LeaveModule } from './modules/leaves/leave.module.js';
+import { PayrollModule } from './modules/payrolls/payroll.module.js';
+import { ContractModule } from './modules/contracts/contract.module.js';
 
 @Module({
   imports: [
@@ -31,6 +34,7 @@ import {validateEnvironment} from './config/env.validation.js'
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_INTERCEPTOR, useClass: TransformResponseInterceptor },
   ],
 })
 export class AppModule {}
