@@ -20,11 +20,8 @@ function filterSwaggerDocument(
   document: OpenAPIObject,
   scope: SwaggerScope,
 ): OpenAPIObject {
-  const allowedPrefixes = [
-    `/api/v1/${scope}`,
-    '/api/v1/auth',
-    '/api/v1/uploads',
-  ];
+  // به دلیل استفاده از URI Versioning، مسیرها در swagger با /v1 (بدون /api) ثبت می‌شوند
+  const allowedPrefixes = [`/v1/${scope}`, '/v1/auth', '/v1/uploads'];
 
   const paths: OpenAPIObject['paths'] = {};
 
@@ -65,7 +62,7 @@ function createSwaggerConfig(
  * مستندات Manager و Employee را در مسیرهای جدا ثبت می‌کند.
  *
  * مقدار SWAGGER_ENABLED توسط validateEnvironment به Boolean تبدیل شده است.
- * پیشوند مسیرها با app.setGlobalPrefix('api/v1') در main.ts هماهنگ است.
+ * پیشوند مسیرها با app.setGlobalPrefix('api') در main.ts هماهنگ است.
  */
 export function setupSwagger(
   app: INestApplication,
@@ -103,7 +100,7 @@ export function setupSwagger(
     'employee',
   );
 
+  // مسیرهای دسترسی به مستندات با ساختار جدید /api/v1 همگام شدند
   SwaggerModule.setup('api/v1/manager/docs', app, () => managerDocument);
-
   SwaggerModule.setup('api/v1/employee/docs', app, () => employeeDocument);
 }
