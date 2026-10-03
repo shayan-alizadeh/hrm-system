@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, MaxLength, ValidateIf } from 'class-validator';
+import { IsOptional, IsString, MaxLength } from 'class-validator';
 
 import { IsJalaliDate } from '../../../common/validators/is-jalali-date.validator.js';
 
@@ -14,7 +14,7 @@ export class CheckInOutDto {
     maxLength: 250,
     nullable: false,
   })
-  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @IsOptional()
   @IsString({
     message: 'یادداشت باید یک رشته متنی باشد.',
   })
@@ -31,7 +31,7 @@ export class CheckInOutDto {
     maxLength: 10,
     nullable: false,
   })
-  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @IsOptional()
   @IsString({
     message: 'تاریخ باید یک رشته متنی باشد.',
   })

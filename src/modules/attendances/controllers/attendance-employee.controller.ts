@@ -1,12 +1,18 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Roles } from '../../auth/decorators/roles.decorator.js';
-import { RoleType } from '../../../../generated/prisma/enums.js'; 
-import { Attendance } from '../../../../generated/prisma/client.js';
+import { RoleType } from '../../../../generated/prisma/enums.js';
+import type { Attendance } from '../../../../generated/prisma/client.js';
 import { AttendanceEmployeeService } from '../services/attendance-employee.service.js';
 import { CheckInOutDto } from '../dto/check-in-out.dto.js';
 import { CurrentUser } from '../../../common/decorators/user.decorator.js';
 import { FilterAttendanceDto } from '../dto/filter-attendance.dto.js';
+
+// پیشنهاد: این اینترفیس در مسیر auth/interfaces تعریف و در پروژه ایمپورت شود
+export interface IJwtPayload {
+  id: number;
+  role: string;
+}
 
 @ApiTags('Attendance - Employee') // مرتب‌سازی در Swagger
 @ApiBearerAuth()
@@ -19,10 +25,10 @@ export class AttendanceEmployeeController {
   @ApiOperation({ summary: 'ثبت ساعت ورود (Check-in)' })
   async checkIn(
     @Body() dto: CheckInOutDto,
-    @CurrentUser() user: { id: number; role: string },
+    @CurrentUser() user: IJwtPayload,
   ): Promise<Attendance> {
-    // تغییر j_date به attendanceDate بر اساس تغییرات دیتابیس
-    return await this.attendanceService.checkIn(
+    // کلمه کلیدی await حذف شد
+    return this.attendanceService.checkIn(
       user.id,
       dto.attendanceDate,
       dto.notes,
@@ -33,10 +39,9 @@ export class AttendanceEmployeeController {
   @ApiOperation({ summary: 'ثبت ساعت خروج (Check-out)' })
   async checkOut(
     @Body() dto: CheckInOutDto,
-    @CurrentUser() user: { id: number; role: string },
+    @CurrentUser() user: IJwtPayload,
   ): Promise<Attendance> {
-    // تغییر j_date به attendanceDate
-    return await this.attendanceService.checkOut(
+    return this.attendanceService.checkOut(
       user.id,
       dto.attendanceDate,
       dto.notes,
@@ -47,8 +52,8 @@ export class AttendanceEmployeeController {
   @ApiOperation({ summary: 'دریافت گزارش حضور و غیاب‌های من' })
   async findMyAttendance(
     @Query() filters: FilterAttendanceDto,
-    @CurrentUser() user: { id: number },
+    @CurrentUser() user: IJwtPayload,
   ): Promise<Attendance[]> {
-    return await this.attendanceService.findMyAttendance(user.id, filters);
+    return this.attendanceService.findMyAttendance(user.id, filters);
   }
 }

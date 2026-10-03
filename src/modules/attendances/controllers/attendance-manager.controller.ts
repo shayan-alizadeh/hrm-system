@@ -34,7 +34,7 @@ export class AttendanceManagerController {
   @ApiOperation({
     summary: 'مشاهده گزارش حضور و غیاب کارکنان با فیلتر',
   })
-  async findAll(@Query() filters: FilterAttendanceDto) {
+  async findAll(@Query() filters: FilterAttendanceDto): Promise<Attendance[]> {
     // تایپ استنباط‌شده، اطلاعات user موجود در خروجی سرویس را نیز حفظ می‌کند.
     return this.attendanceManagerService.findAll(filters);
   }
@@ -43,7 +43,7 @@ export class AttendanceManagerController {
   @ApiOperation({
     summary: 'مشاهده جزئیات رکورد حضور و غیاب',
   })
-  async findOne(@Param('id', ParseIdPipe) id: number) {
+  async findOne(@Param('id', ParseIdPipe) id: number): Promise<Attendance> {
     return this.attendanceManagerService.findOne(id);
   }
 

@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsInt, IsString, Max, Min, ValidateIf } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 import { IsJalaliDate } from '../../../common/validators/is-jalali-date.validator.js';
 
@@ -19,8 +19,14 @@ export class FilterAttendanceDto {
     maximum: 2_147_483_647,
     nullable: false,
   })
-  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
-  @Type(() => Number)
+  @Transform(({ value }: { value: unknown }) => {
+    // جلوگیری از خطای NaN در صورت ارسال رشته‌های غیرعددی
+    if (typeof value === 'string' && /^\d+$/.test(value)) {
+      return Number(value);
+    }
+    return value;
+  })
+  @IsOptional()
   @IsInt({
     message: 'شناسه کاربر باید یک عدد صحیح باشد.',
   })
@@ -39,7 +45,7 @@ export class FilterAttendanceDto {
     maxLength: 10,
     nullable: false,
   })
-  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @IsOptional()
   @IsString({
     message: 'تاریخ شروع باید یک رشته متنی باشد.',
   })
@@ -55,7 +61,7 @@ export class FilterAttendanceDto {
     maxLength: 10,
     nullable: false,
   })
-  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @IsOptional()
   @IsString({
     message: 'تاریخ پایان باید یک رشته متنی باشد.',
   })

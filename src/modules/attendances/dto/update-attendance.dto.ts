@@ -1,10 +1,10 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsDateString,
+  IsOptional,
   IsString,
   Matches,
   MaxLength,
-  ValidateIf,
 } from 'class-validator';
 
 /**
@@ -29,7 +29,7 @@ export class UpdateAttendanceDto {
     format: 'date-time',
     nullable: false,
   })
-  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @IsOptional()
   @IsString({
     message: 'زمان ورود باید یک رشته متنی باشد.',
   })
@@ -50,7 +50,7 @@ export class UpdateAttendanceDto {
     format: 'date-time',
     nullable: false,
   })
-  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @IsOptional()
   @IsString({
     message: 'زمان خروج باید یک رشته متنی باشد.',
   })
@@ -74,7 +74,7 @@ export class UpdateAttendanceDto {
     maxLength: 250,
     nullable: false,
   })
-  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @IsOptional()
   @IsString({
     message: 'یادداشت مدیر باید یک رشته متنی باشد.',
   })
