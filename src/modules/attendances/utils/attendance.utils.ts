@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  InternalServerErrorException,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -10,12 +11,12 @@ import { PrismaService } from '../../../prisma/prisma.service.js';
 const MAX_TRANSACTION_ATTEMPTS = 3;
 const MAX_NOTES_LENGTH = 250;
 
-const jalaliFormatter = new Intl.DateTimeFormat('fa-IR', {
+// استفاده از fa-IR-u-nu-latn برای اطمینان از خروجی اعداد لاتین در تمامی محیط‌ها
+const jalaliFormatter = new Intl.DateTimeFormat('fa-IR-u-nu-latn', {
   year: 'numeric',
   month: '2-digit',
   day: '2-digit',
   calendar: 'persian',
-  numberingSystem: 'latn',
   timeZone: 'Asia/Tehran',
 });
 
@@ -31,7 +32,9 @@ export function getTehranJalaliDate(date: Date): string {
   const day = parts.find((part) => part.type === 'day')?.value;
 
   if (!year || !month || !day) {
-    throw new Error('Could not format the Persian calendar date.');
+    throw new InternalServerErrorException(
+      'خطای سیستمی: امکان تولید تاریخ شمسی وجود ندارد.',
+    );
   }
 
   return `${year.padStart(4, '0')}/${month.padStart(2, '0')}/${day.padStart(2, '0')}`;
@@ -74,8 +77,8 @@ export function buildAttendanceDateFilter(
   }
 
   return {
-    ...(startDate !== undefined ? { gte: startDate } : {}),
-    ...(endDate !== undefined ? { lte: endDate } : {}),
+    ...(startDate !== undefined && { gte: startDate }),
+    ...(endDate !== undefined && { lte: endDate }),
   };
 }
 

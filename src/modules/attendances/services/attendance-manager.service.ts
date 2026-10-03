@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { Prisma } from '../../../../generated/prisma/client.js';
 import { PrismaService } from '../../../prisma/prisma.service.js';
@@ -26,20 +22,11 @@ export class AttendanceManagerService {
       filters.endDate,
     );
 
-    if (
-      filters.userId !== undefined &&
-      (!Number.isInteger(filters.userId) ||
-        filters.userId < 1 ||
-        filters.userId > 2_147_483_647)
-    ) {
-      throw new BadRequestException(
-        'شناسه کاربر باید عدد صحیح مثبت در محدوده مجاز باشد.',
-      );
-    }
+    // اعتبارسنجی تکراری userId که وظیفه DTO بود از این قسمت حذف شد.
 
     return this.prisma.attendance.findMany({
       where: {
-        ...(filters.userId !== undefined ? { userId: filters.userId } : {}),
+        ...(filters.userId !== undefined && { userId: filters.userId }),
         attendanceDate: dateFilter,
       },
       include: {
@@ -110,8 +97,8 @@ export class AttendanceManagerService {
       return tx.attendance.update({
         where: { id },
         data: {
-          ...(dto.checkIn !== undefined ? { checkInTime } : {}),
-          ...(dto.checkOut !== undefined ? { checkOutTime } : {}),
+          ...(dto.checkIn !== undefined && { checkInTime }),
+          ...(dto.checkOut !== undefined && { checkOutTime }),
           notes: updatedNotes,
         },
       });
