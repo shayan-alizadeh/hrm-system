@@ -10,10 +10,6 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Roles } from '../../../modules/auth/decorators/roles.decorator.js';
-import {
-  LeaveRequest,
-  LeaveBalance,
-} from '../../../../generated/prisma/client.js';
 import { RoleType } from '../../../../generated/prisma/enums.js';
 
 import { CurrentUser } from '../../../common/decorators/user.decorator.js';
@@ -31,9 +27,7 @@ export class LeaveEmployeeController {
 
   @Get('balance')
   @ApiOperation({ summary: 'مشاهده مانده مرخصی استحقاقی امسال من' })
-  async getMyBalance(
-    @CurrentUser() user: { id: number },
-  ): Promise<LeaveBalance> {
+  async getMyBalance(@CurrentUser() user: { id: number }) {
     return await this.leavesService.getMyBalance(user.id);
   }
 
@@ -42,7 +36,7 @@ export class LeaveEmployeeController {
   async createRequest(
     @Body() dto: CreateLeaveRequestDto,
     @CurrentUser() user: { id: number },
-  ): Promise<LeaveRequest> {
+  ) {
     return await this.leavesService.createRequest(user.id, dto);
   }
 
@@ -51,7 +45,7 @@ export class LeaveEmployeeController {
   async getMyRequests(
     @Query() filters: FilterLeaveDto,
     @CurrentUser() user: { id: number },
-  ): Promise<LeaveRequest[]> {
+  ) {
     return await this.leavesService.getMyRequests(user.id, filters);
   }
 
@@ -60,7 +54,7 @@ export class LeaveEmployeeController {
   async cancelRequest(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: { id: number },
-  ): Promise<LeaveRequest> {
+  ) {
     return await this.leavesService.cancelRequest(id, user.id);
   }
 }
