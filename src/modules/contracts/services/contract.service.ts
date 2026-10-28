@@ -14,7 +14,7 @@ import { PrismaService } from '../../../prisma/prisma.service.js';
 import { CreateContractDto } from '../dto/create-contract.dto.js';
 import { UpdateContractDto } from '../dto/update-contract.dto.js';
 
-// تغییر تایپ‌ها برای پشتیبانی هم‌‌زمان از number ورودی کاربر و Decimal دیتابیس
+// تغییر تایپ‌ها برای پشتیبانی هم‌‌زمان از number ورودی کاربر و Decimal دیتابیس.
 type ContractValues = {
   userId: number;
   contractNo: string;
