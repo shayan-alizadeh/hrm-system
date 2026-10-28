@@ -274,7 +274,7 @@ export class ContractService {
   }
 
   /**
-   * ACTIVE به وضعیت ثبت‌شده اشاره دارد.
+   * ACTIVE به وضعیت ثبت‌شده اشاره دارد
    * بررسی پوشش بازه فیش بر عهده سرویس Payroll است.
    */
   async getActiveContractByUserId(userId: number) {
