@@ -96,7 +96,7 @@ export class ContractService {
   }
 
   /**
-   * اعتبارسنجی وضعیت نهایی قرارداد، به‌ویژه برای PATCH جزئی.
+   * اعتبارسنجی وضعیت نهایی قرارداد، به‌ویژه برای PATCH جزئی
    */
   private validateContract(values: ContractValues): void {
     this.assertId(values.userId);
