@@ -150,7 +150,7 @@ export class ContractService {
 
   /**
    * تنها تعارض تراکنشی تکرار می‌شود.
-   * callback نباید شامل اثر جانبی خارج از دیتابیس باشد.
+   * callback نباید شامل اثر جانبی خارج از دیتابیس باش
    */
   private async runTransaction<T>(
     operation: (tx: Prisma.TransactionClient) => Promise<T>,
